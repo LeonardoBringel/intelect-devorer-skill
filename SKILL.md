@@ -27,6 +27,23 @@ tecnologias ficam na forma original (`Java Streams`, `OAuth 2.0`,
 
 Não crie novas pastas de nível superior sem uma necessidade clara e recorrente.
 
+## Templates: a fonte de verdade é o vault
+
+A estrutura de cada tipo de nota (frontmatter e seções) é definida pelos
+arquivos em `<vault>/templates/` — `Daily Template.md`, `Dump Template.md`,
+`Knowledge Template.md`, `Project Template.md`. **Nunca** invente um layout
+próprio nem copie um template para dentro desta skill: sempre parta do template
+do vault, para que a nota criada pelo Claude seja indistinguível de uma criada
+pelo usuário no Obsidian.
+
+Para obter um template já renderizado (com `created:` na data de hoje):
+
+```bash
+python3 scripts/vault.py template "<caminho-do-vault>" <daily|dump|knowledge|project>
+```
+
+Se o template do vault mudar, o comportamento acompanha — sem ajustes na skill.
+
 ## O fluxo de captura
 
 Quando o usuário quiser persistir algo, siga este raciocínio (nem todo passo se
@@ -46,7 +63,7 @@ aplica sempre — use o bom senso):
    órfãs):
 
    ```bash
-   python scripts/vault.py find "<caminho-do-vault>" "<conceito>"
+   python3 scripts/vault.py find "<caminho-do-vault>" "<conceito>"
    ```
 
    Se existe, **linke/atualize** a nota existente em vez de criar outra. O
@@ -54,8 +71,11 @@ aplica sempre — use o bom senso):
 
 4. **Crie ou atualize a nota.** O nome do arquivo é o título da nota
    (`03 - Knowledge/PostgreSQL MVCC.md`); wikilinks referenciam pelo título.
-   Use os templates em `templates/`. Escreva prosa em português,
-   com links no corpo pros conceitos citados.
+   Parta sempre do template do vault (`python3 scripts/vault.py template <vault>
+   <tipo>`, ou leia `<vault>/templates/` direto) e preencha os campos —
+   `created` com a data de hoje, `aliases` quando fizer sentido. Escreva prosa
+   em português, com links no corpo pros conceitos citados. Não altere as
+   seções nem o frontmatter definidos pelo template.
 
 5. **Extraia aprendizados permanentes.** Se um projeto rendeu um aprendizado com
    valor além dele, crie a nota em Knowledge e faça o Project **apontar** pra
@@ -64,12 +84,15 @@ aplica sempre — use o bom senso):
 6. **Registre na Daily.** Para cada nota tocada:
 
    ```bash
-   python scripts/vault.py log "<caminho-do-vault>" "<Título>" "<descrição curta>"
+   python3 scripts/vault.py log "<caminho-do-vault>" "<Título>" "<descrição curta>" --section <Projetos|Aprendizados|Outros>
    ```
 
-   Isso cria a nota do dia se não existir e adiciona a linha sem duplicar. A
-   Daily preserva o contexto do dia mas **não** contém o conhecimento — só o
-   wikilink e no máximo uma linha do que mudou.
+   Escolha a seção pelo tipo da nota: nota de `02 - Projects` → `Projetos`,
+   nota de `03 - Knowledge` → `Aprendizados`, o resto → `Outros` (padrão). Isso
+   cria a nota do dia a partir do `Daily Template.md` do vault se ela não
+   existir, remove os bullets de exemplo do template e adiciona a linha sem
+   duplicar. A Daily preserva o contexto do dia mas **não** contém o
+   conhecimento — só o wikilink e no máximo uma linha do que mudou.
 
 7. **Arquivos → Resources.** Se o conhecimento vem com um arquivo (pdf, ppt…),
    coloque-o em `04 - Resources/` e referencie a partir da nota relevante
@@ -97,9 +120,10 @@ gigantes que tentam explicar assuntos completamente diferentes. Uma nota pode
 representada por um link/uma nota, prefira o link. Tags servem pra cortes
 transversais amplos (ex: `#revisar`), não pra substituir a rede de links.
 
-**Frontmatter com propósito.** Só adicione uma propriedade se ela servir a
-filtragem, Dataview, automação, status ou recuperação. Ver esquemas por tipo em
-`templates/`. Propriedade que não vai ser usada é ruído.
+**Frontmatter com propósito.** O frontmatter de cada tipo já vem do template do
+vault (`<vault>/templates/`) — respeite-o. Só adicione uma propriedade extra se
+ela servir a filtragem, Dataview, automação, status ou recuperação. Propriedade
+que não vai ser usada é ruído.
 
 ## Ciclo de vida: Dump e Archives
 
@@ -123,8 +147,10 @@ queira reforçar depois.
 
 ## Referências
 
-- `templates/` — templates de cada tipo de nota, esquemas de
-  frontmatter e um exemplo de fluxo completo. Leia quando for criar/editar notas.
+- `<vault>/templates/` — a fonte de verdade do layout de cada tipo de nota
+  (frontmatter + seções). Sob controle do usuário, no próprio Obsidian. Leia
+  (ou renderize com `vault.py template`) antes de criar/editar notas; esta skill
+  não guarda templates próprios.
 - `scripts/vault.py` — helper para localizar pastas, achar notas existentes
-  (evitar duplicar) e gerenciar a Daily. `python scripts/vault.py -h` lista os
-  subcomandos.
+  (evitar duplicar), renderizar templates do vault e gerenciar a Daily.
+  `python3 scripts/vault.py -h` lista os subcomandos.
