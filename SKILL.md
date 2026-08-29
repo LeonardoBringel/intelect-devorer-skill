@@ -1,0 +1,130 @@
+---
+name: obsidian-second-brain
+description: Captura e organiza conhecimento no vault "second brain" do Obsidian do usuário — de sessões de código, estudos, projetos e ideias — como notas atômicas, interligadas e recuperáveis, seguindo uma estrutura fixa de pastas (00 Dump, 01 Daily, 02 Projects, 03 Knowledge, 04 Resources, 05 Archives). Use esta skill sempre que o usuário quiser salvar, capturar, registrar, anotar ou arquivar algo no vault / segundo cérebro / Obsidian — por exemplo "anota isso", "salva no meu vault", "registra essa decisão do projeto", "transforma isso numa nota de conhecimento", "adiciona ao meu segundo cérebro", ou ao final de uma sessão de código/estudo que valha a pena preservar. Também vale quando se está trabalhando diretamente dentro de um diretório de vault do Obsidian. Dispare mesmo que o usuário não diga "Obsidian" explicitamente, desde que a intenção seja claramente persistir conhecimento nas notas dele.
+---
+
+# Obsidian Second Brain
+
+O papel desta skill não é só guardar informação. É ajudar a transformar
+informação dispersa em **conhecimento estruturado, recuperável e conectado**. O
+vault é uma **rede de conhecimento**, não uma hierarquia rígida de pastas — por
+isso, na dúvida, **links importam mais que pastas**.
+
+Todo o conteúdo das notas é em **português**. Nomes canônicos de conceitos e
+tecnologias ficam na forma original (`Java Streams`, `OAuth 2.0`,
+`PostgreSQL MVCC`) — traduzir quebraria a ligação com o conceito real.
+
+## Onde cada coisa vive
+
+| Pasta | Papel | Vai pra cá quando… |
+|-------|-------|--------------------|
+| `00 - Dump` | captura rápida, incompleta | é um fragmento que ainda não merece lar definitivo; ponto de partida de outra nota. **Não** é destino permanente |
+| `01 - Daily` | índice temporal do dia | **sempre** — toda nota criada/atualizada ganha uma menção (wikilink + descrição curta). Nunca guarda o conhecimento em si |
+| `02 - Projects` | atividade com começo/meio/fim | acompanhar progresso, decisões técnicas, aprendizados de um projeto (software ou qualquer coisa mensurável) |
+| `03 - Knowledge` | conceitos e aprendizados atômicos | a informação continua útil **fora** do contexto onde foi descoberta |
+| `04 - Resources` | arquivos anexos (pdf, ppt, etc.) | há um arquivo a guardar. Links pra sites/blogs ficam **dentro da nota**, não aqui |
+| `05 - Archives` | conteúdo depreciado | algo deixou de ser útil e sai de circulação (nunca delete por conta própria — mova) |
+
+Não crie novas pastas de nível superior sem uma necessidade clara e recorrente.
+
+## O fluxo de captura
+
+Quando o usuário quiser persistir algo, siga este raciocínio (nem todo passo se
+aplica sempre — use o bom senso):
+
+1. **Entenda e decomponha.** Uma nota deve responder a uma ideia específica. Se
+   o material mistura assuntos, quebre em notas atômicas. Prefira
+   `Java Streams`, `Java Records`, `JVM Garbage Collection` a um `Java.md`
+   gigante — isso permite conectar conceitos com precisão.
+
+2. **Classifique cada ideia** usando a tabela acima. O teste decisivo pra
+   Knowledge é: *"isso continuaria útil se o projeto/contexto onde descobri
+   deixasse de existir?"* Se sim → Knowledge. Se é detalhe específico do
+   projeto → fica no Project.
+
+3. **Verifique se já existe** antes de criar (evita duplicatas e variantes
+   órfãs):
+
+   ```bash
+   python scripts/vault.py find "<caminho-do-vault>" "<conceito>"
+   ```
+
+   Se existe, **linke/atualize** a nota existente em vez de criar outra. O
+   `find` também casa por `aliases`, então `OAuth2` encontra `[[OAuth 2.0]]`.
+
+4. **Crie ou atualize a nota.** O nome do arquivo é o título da nota
+   (`03 - Knowledge/PostgreSQL MVCC.md`); wikilinks referenciam pelo título.
+   Use os templates em `templates/`. Escreva prosa em português,
+   com links no corpo pros conceitos citados.
+
+5. **Extraia aprendizados permanentes.** Se um projeto rendeu um aprendizado com
+   valor além dele, crie a nota em Knowledge e faça o Project **apontar** pra
+   ela. Não copie o conhecimento pro Project.
+
+6. **Registre na Daily.** Para cada nota tocada:
+
+   ```bash
+   python scripts/vault.py log "<caminho-do-vault>" "<Título>" "<descrição curta>"
+   ```
+
+   Isso cria a nota do dia se não existir e adiciona a linha sem duplicar. A
+   Daily preserva o contexto do dia mas **não** contém o conhecimento — só o
+   wikilink e no máximo uma linha do que mudou.
+
+7. **Arquivos → Resources.** Se o conhecimento vem com um arquivo (pdf, ppt…),
+   coloque-o em `04 - Resources/` e referencie a partir da nota relevante
+   (`![[palestra.pdf]]` ou `[[palestra.pdf]]`). Links pra fontes externas ficam
+   dentro da nota, não em Resources.
+
+## Princípios que guiam as decisões
+
+**Links são mais importantes que pastas.** Sempre que uma nota tiver relação
+relevante com outra, crie o link (`[[PostgreSQL MVCC]]`). Não tenha medo de
+criar muitos links — uma nota rica em links é o objetivo, não um problema. O
+vault deve ser uma rede.
+
+**Não duplique conhecimento.** Se um conceito já é (ou deveria ser) uma nota,
+**referencie**: escreva `O projeto usa [[OAuth 2.0]]`, e não cole a explicação
+inteira de OAuth dentro da nota do projeto. Antes de explicar um conceito geral
+dentro de um Project ou Daily, pergunte-se se ele não deveria ser uma nota de
+Knowledge própria — quase sempre deveria.
+
+**Notas atômicas.** Uma nota = uma ideia razoavelmente bem definida. Evite notas
+gigantes que tentam explicar assuntos completamente diferentes. Uma nota pode
+(e deve) ter muitos links.
+
+**Tags com moderação.** Não crie tag pra cada conceito — se a relação já pode ser
+representada por um link/uma nota, prefira o link. Tags servem pra cortes
+transversais amplos (ex: `#revisar`), não pra substituir a rede de links.
+
+**Frontmatter com propósito.** Só adicione uma propriedade se ela servir a
+filtragem, Dataview, automação, status ou recuperação. Ver esquemas por tipo em
+`templates/`. Propriedade que não vai ser usada é ruído.
+
+## Ciclo de vida: Dump e Archives
+
+**Dump não é depósito permanente.** É trampolim. Quando revisitar uma nota de
+Dump — ou quando ela amadurecer — promova-a: transforme em nota de Knowledge ou
+Project apropriada, ajuste os links, e limpe o fragmento do Dump. Evite deixar
+informação importante apodrecendo ali.
+
+**Archives só recebe, e só por decisão explícita.** Mova pra `05 - Archives/` o
+que o usuário considera depreciado — nunca delete no lugar dele. Mover o arquivo
+entre pastas **não quebra** os wikilinks `[[título]]` (o Obsidian resolve por
+nome, não por caminho), desde que o nome do arquivo continue único. Se houver
+colisão de nome, resolva antes de mover.
+
+## Ao terminar
+
+Feche o loop de forma útil: diga em uma linha o que foi criado/atualizado e
+onde, mencionando os principais links criados. Isso ajuda o usuário a confiar
+que a rede está crescendo de forma coerente — e a perceber conexões que talvez
+queira reforçar depois.
+
+## Referências
+
+- `templates/` — templates de cada tipo de nota, esquemas de
+  frontmatter e um exemplo de fluxo completo. Leia quando for criar/editar notas.
+- `scripts/vault.py` — helper para localizar pastas, achar notas existentes
+  (evitar duplicar) e gerenciar a Daily. `python scripts/vault.py -h` lista os
+  subcomandos.
