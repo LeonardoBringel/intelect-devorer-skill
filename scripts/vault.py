@@ -24,6 +24,7 @@ Uso:
   python vault.py log      <vault> "<Título da nota>" "<descrição curta>" [--section Projetos|Aprendizados|Outros] [--date YYYY-MM-DD]
   python vault.py folder   <vault> <NN>          # imprime o caminho da pasta pelo prefixo (00..05)
   python vault.py tree     <vault>               # visão rápida da estrutura
+  python vault.py version                        # versão da skill (vai pro frontmatter)
 """
 
 import argparse
@@ -31,6 +32,18 @@ import datetime as dt
 import os
 import re
 import sys
+
+# Versão da skill, gravada em `skill_version` nas notas criadas. Serve para
+# responder depois "sob quais regras esta nota foi escrita?" — então precisa ser
+# um valor discreto e comparável, não algo derivado da árvore de trabalho.
+#
+# Declarada aqui de propósito, e NÃO lida do git: a cópia em execução da skill
+# pode não ser um checkout (`git describe` falharia), e numa árvore suja o git
+# devolveria o mesmo valor antes e depois de uma mudança de comportamento.
+#
+# Bump manual no release, junto com a tag git — mesma disciplina do
+# `template_version` dos templates do vault.
+SKILL_VERSION = "0.2.0"
 
 # Prefixo numérico -> apelido lógico. O nome exato ("00 - Dump") pode variar
 # um pouco entre vaults, então resolvemos pela numeração, que é estável.
@@ -107,8 +120,18 @@ def load_template(vault: str, kind: str) -> str:
 
 
 def render_template(text: str, date: str) -> str:
-    """Ajusta o `created:` do frontmatter para a data alvo. O resto fica como está."""
-    return re.sub(r"(?m)^created:.*$", f"created: {date}", text, count=1)
+    """Preenche `created:` e `skill_version:` no frontmatter. O resto fica como está.
+
+    Estampar aqui é deliberado: são os campos que o script sabe responder
+    sozinho, então não dependem de o modelo lembrar de preenchê-los. Cada
+    `sub` só age se a chave existir no template (o Dump, por exemplo, não tem
+    `skill_version`) — nunca inventamos campo que o template do vault não pede.
+    """
+    text = re.sub(r"(?m)^created:.*$", f"created: {date}", text, count=1)
+    text = re.sub(
+        r"(?m)^skill_version:.*$", f'skill_version: "{SKILL_VERSION}"', text, count=1
+    )
+    return text
 
 
 def _templates_dir_or_none(vault: str):
@@ -271,6 +294,10 @@ def cmd_log(args):
     print(f"[ok] registrado na Daily de {args.date} (seção {args.section}): {entry}")
 
 
+def cmd_version(args):
+    print(SKILL_VERSION)
+
+
 def cmd_tags(args):
     """Lista o vocabulário de tags já em uso, da mais frequente pra menos.
 
@@ -342,6 +369,9 @@ def main():
     sp.add_argument("--section", choices=DAILY_SECTIONS, default="Outros")
     sp.add_argument("--date", default=today())
     sp.set_defaults(func=cmd_log)
+
+    sp = sub.add_parser("version", help="imprime a versão da skill")
+    sp.set_defaults(func=cmd_version)
 
     sp = sub.add_parser("tags", help="lista o vocabulário de tags em uso")
     sp.add_argument("vault")

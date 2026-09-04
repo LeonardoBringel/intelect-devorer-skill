@@ -84,6 +84,12 @@ aplica sempre — use o bom senso):
    python3 scripts/vault.py tags "<caminho-do-vault>"
    ```
 
+   Sobre os campos de metadado do frontmatter: `created` e `skill_version` já
+   vêm preenchidos pelo `vault.py template` — **não** os edite à mão.
+   `template_version` é do vault e fica como está. Já `llm_model_used` só você
+   sabe responder: preencha com o modelo que está escrevendo a nota (ex:
+   `claude-opus-5`).
+
 5. **Extraia aprendizados permanentes.** Se um projeto rendeu um aprendizado com
    valor além dele, crie a nota em Knowledge e faça o Project **apontar** pra
    ela. Não copie o conhecimento pro Project.
