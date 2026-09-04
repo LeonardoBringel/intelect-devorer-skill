@@ -18,10 +18,11 @@ Sem dependências externas — só a biblioteca padrão do Python 3.
 
 Uso:
   python vault.py find     <vault> "<termo>"
+  python vault.py fmt      <arquivo|pasta|vault> [--check]   # normaliza a forma das notas
   python vault.py tags     <vault> ["<termo>"]   # vocabulário de tags já em uso
   python vault.py template <vault> <daily|dump|knowledge|project> [--date YYYY-MM-DD]
   python vault.py daily    <vault> [--date YYYY-MM-DD]
-  python vault.py log      <vault> "<Título da nota>" "<descrição curta>" [--section Projetos|Aprendizados|Outros] [--date YYYY-MM-DD]
+  python vault.py log      <vault> "<Título da nota>" "<descrição curta>" [--section Projetos|Aprendizados|"Outras notas"] [--date YYYY-MM-DD]
   python vault.py folder   <vault> <NN>          # imprime o caminho da pasta pelo prefixo (00..05)
   python vault.py tree     <vault>               # visão rápida da estrutura
   python vault.py version                        # versão da skill (vai pro frontmatter)
@@ -29,6 +30,7 @@ Uso:
 
 import argparse
 import datetime as dt
+import difflib
 import os
 import re
 import sys
@@ -43,7 +45,7 @@ import sys
 #
 # Bump manual no release, junto com a tag git — mesma disciplina do
 # `template_version` dos templates do vault.
-SKILL_VERSION = "0.2.0"
+SKILL_VERSION = "0.3.0"
 
 # Prefixo numérico -> apelido lógico. O nome exato ("00 - Dump") pode variar
 # um pouco entre vaults, então resolvemos pela numeração, que é estável.
@@ -66,8 +68,14 @@ TEMPLATE_FILE = {
 }
 
 # Seções da Daily onde `log` pode inserir entradas. Devem bater com os
-# cabeçalhos `## ...` do `Daily Template.md` do vault.
-DAILY_SECTIONS = ["Projetos", "Aprendizados", "Outros"]
+# cabeçalhos `## ...` do `Daily Template.md` do vault. `Pendentes` fica de fora
+# de propósito: lá vão checkboxes de tarefa, não registro de nota tocada.
+DAILY_SECTIONS = ["Projetos", "Aprendizados", "Outras notas"]
+
+# Nomes antigos de seção que ainda existem em daily já escritas. Sem isso, uma
+# daily criada quando a seção se chamava "Outros" ganharia uma segunda seção em
+# vez de receber a entrada na que já está lá.
+SECTION_ALIASES = {"Outras notas": ("outras notas", "outros")}
 
 # Linhas de exemplo dos templates que devem sair quando entra conteúdo real.
 PLACEHOLDER_LINES = {
@@ -143,9 +151,15 @@ def _templates_dir_or_none(vault: str):
 
 
 def iter_notes(vault: str):
-    """Gera (caminho, título) de toda nota .md do vault, exceto os templates."""
+    """Gera (caminho, título) de toda nota .md do vault, exceto os templates.
+
+    Pastas ocultas ficam de fora: `.obsidian/` guarda plugins, e vários deles
+    trazem um `README.md` que não é nota do usuário — o `fmt` não pode reescrever
+    esses arquivos, nem o `find` deve devolvê-los.
+    """
     tdir = _templates_dir_or_none(vault)
-    for root, _dirs, files in os.walk(vault):
+    for root, dirs, files in os.walk(vault):
+        dirs[:] = [d for d in dirs if not d.startswith(".")]
         if tdir is not None and os.path.normpath(root) == tdir:
             continue
         for f in files:
@@ -244,8 +258,9 @@ def _section_bounds(lines, section: str):
     `inicio` já pula a linha separadora `---` logo abaixo do cabeçalho, se houver.
     Retorna (None, None) se a seção não existe no arquivo.
     """
-    target = f"## {section}".lower()
-    hdr = next((i for i, ln in enumerate(lines) if ln.strip().lower() == target), None)
+    names = SECTION_ALIASES.get(section, (section.lower(),))
+    targets = {f"## {n}" for n in names}
+    hdr = next((i for i, ln in enumerate(lines) if ln.strip().lower() in targets), None)
     if hdr is None:
         return None, None
     start = hdr + 1
@@ -324,6 +339,167 @@ def cmd_tags(args):
         print(f"  {n:3}  {tag}")
 
 
+# --- Formatação de notas -----------------------------------------------------
+#
+# O `fmt` cuida das regras de forma que são deterministas — desfazer hard wrap e
+# garantir o divider `---` sob cada cabeçalho. São regras que o modelo esquece ao
+# longo de uma sessão longa, e que uma função aplica sempre igual. O que NÃO está
+# aqui é densidade textual: cortar redundância é julgamento, e mora no SKILL.md.
+
+FENCE_RE = re.compile(r"^\s{0,3}(?:```|~~~)")
+HEADER_RE = re.compile(r"^#{1,6}\s+\S")
+THEMATIC_BREAK = ("---", "***", "___")
+
+# Uma linha que abre seu próprio bloco nunca é continuação da anterior: item de
+# lista, citação, tabela, cabeçalho, régua horizontal.
+BLOCK_START_RE = re.compile(
+    r"^\s*(?:[-*+]\s+|\d+[.)]\s+|>|\||#{1,6}\s|---\s*$|\*\*\*\s*$|___\s*$)"
+)
+LIST_ITEM_RE = re.compile(r"^\s*(?:[-*+]\s+|\d+[.)]\s+)")
+
+
+def _is_indented_code(line: str) -> bool:
+    """Linha indentada que NÃO pertence a um item de lista = bloco de código."""
+    return (line.startswith("    ") or line.startswith("\t")) and not LIST_ITEM_RE.match(line)
+
+
+def split_frontmatter(text: str):
+    """Separa o frontmatter YAML do corpo. O frontmatter nunca é reformatado."""
+    m = re.match(r"^---\n.*?\n---\n?", text, re.DOTALL)
+    if not m:
+        return "", text
+    return m.group(0), text[m.end():]
+
+
+def _is_continuation(line: str, prev: str) -> bool:
+    """A linha é continuação visual da anterior (fruto de hard wrap)?"""
+    if not line.strip() or BLOCK_START_RE.match(line):
+        return False
+    if line.startswith("    ") or line.startswith("\t"):
+        # indentação profunda só é continuação dentro de lista; fora dela é
+        # bloco de código indentado, que passa intacto.
+        return bool(LIST_ITEM_RE.match(prev))
+    return True
+
+
+def _accepts_continuation(prev: str) -> bool:
+    """A linha anterior pode absorver uma continuação?"""
+    if not prev or not prev.strip():
+        return False
+    if prev.endswith("  ") or prev.endswith("\\"):
+        return False  # quebra de linha explícita do Markdown — é intencional
+    if _is_indented_code(prev):
+        return False
+    s = prev.strip()
+    if HEADER_RE.match(s) or s in THEMATIC_BREAK:
+        return False
+    return not (s.startswith("|") or s.startswith(">"))
+
+
+def format_markdown(text: str) -> str:
+    """Normaliza o corpo da nota.
+
+    Três regras: (1) parágrafo/item é uma linha física só — linhas quebradas por
+    largura são rejuntadas; (2) todo cabeçalho leva `---` logo abaixo e o
+    conteúdo começa na linha seguinte, sem branco no meio; (3) uma linha em
+    branco antes de cada cabeçalho e no máximo uma entre blocos.
+
+    Frontmatter e blocos de código cercados passam intactos.
+    """
+    front, body = split_frontmatter(text)
+    lines = body.split("\n")
+    out: list[str] = []
+    in_fence = False
+    i = 0
+
+    while i < len(lines):
+        raw = lines[i].rstrip("\n")
+        line = raw.rstrip()
+        if line and raw[len(line):].startswith("  "):
+            line += "  "  # break duro do Markdown: intencional, sobrevive
+
+        if FENCE_RE.match(line):
+            in_fence = not in_fence
+            out.append(line)
+            i += 1
+            continue
+
+        if in_fence:
+            out.append(lines[i].rstrip("\n"))
+            i += 1
+            continue
+
+        if not line.strip():
+            if out and out[-1].strip():
+                out.append("")
+            i += 1
+            continue
+
+        if HEADER_RE.match(line):
+            while out and not out[-1].strip():
+                out.pop()
+            if out:
+                out.append("")
+            out.append(line.rstrip())
+            # o divider é obrigatório: reaproveita o que já existe (mesmo
+            # separado por linhas em branco) ou insere um.
+            j = i + 1
+            while j < len(lines) and not lines[j].strip():
+                j += 1
+            out.append("---")
+            i = j + 1 if j < len(lines) and lines[j].strip() in THEMATIC_BREAK else i + 1
+            while i < len(lines) and not lines[i].strip():
+                i += 1
+            continue
+
+        if out and _is_continuation(line, out[-1]) and _accepts_continuation(out[-1]):
+            tail = "  " if line.endswith("  ") else ""
+            out[-1] = f"{out[-1]} {line.strip()}{tail}"
+        else:
+            out.append(line)
+        i += 1
+
+    return front + ("\n".join(out).strip("\n") + "\n" if out else "")
+
+
+def _fmt_targets(target: str):
+    """Resolve o alvo do `fmt` em uma lista de notas (nunca inclui templates)."""
+    if os.path.isfile(target):
+        return [target]
+    if os.path.isdir(target):
+        return sorted(path for path, _title in iter_notes(target))
+    sys.exit(f"[erro] alvo não encontrado: {target}")
+
+
+def cmd_fmt(args):
+    """Normaliza a formatação das notas; com --check, só relata e sai com 1."""
+    pending = 0
+    for path in _fmt_targets(args.target):
+        with open(path, encoding="utf-8") as fh:
+            old = fh.read()
+        new = format_markdown(old)
+        if new == old:
+            continue
+        pending += 1
+        rel = os.path.relpath(path, args.target if os.path.isdir(args.target) else os.path.dirname(path) or ".")
+        if args.check:
+            diff = list(difflib.unified_diff(old.splitlines(), new.splitlines(), lineterm="", n=0))
+            print(f"[check] {rel}")
+            for ln in diff[2:8]:
+                print(f"        {ln}")
+        else:
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write(new)
+            print(f"[fmt] {rel}")
+
+    if not pending:
+        print("[ok] formatação já está normalizada.")
+        return
+    if args.check:
+        print(f"\n{pending} nota(s) fora do padrão — rode sem --check para corrigir.")
+        sys.exit(1)
+
+
 def cmd_folder(args):
     print(resolve_folder(args.vault, args.prefix))
 
@@ -366,7 +542,7 @@ def main():
     sp.add_argument("vault")
     sp.add_argument("title")
     sp.add_argument("description", nargs="?", default="")
-    sp.add_argument("--section", choices=DAILY_SECTIONS, default="Outros")
+    sp.add_argument("--section", choices=DAILY_SECTIONS, default=DAILY_SECTIONS[-1])
     sp.add_argument("--date", default=today())
     sp.set_defaults(func=cmd_log)
 
@@ -377,6 +553,11 @@ def main():
     sp.add_argument("vault")
     sp.add_argument("term", nargs="?", default="")
     sp.set_defaults(func=cmd_tags)
+
+    sp = sub.add_parser("fmt", help="normaliza a formatação das notas (unwrap + divider)")
+    sp.add_argument("target", help="arquivo .md, pasta do vault ou o vault inteiro")
+    sp.add_argument("--check", action="store_true", help="só relata o que está fora do padrão")
+    sp.set_defaults(func=cmd_fmt)
 
     sp = sub.add_parser("folder", help="resolve pasta pelo prefixo (00..05)")
     sp.add_argument("vault")
