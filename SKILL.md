@@ -77,6 +77,13 @@ aplica sempre — use o bom senso):
    em português, com links no corpo pros conceitos citados. Não altere as
    seções nem o frontmatter definidos pelo template.
 
+   Preencha também `tags` com o domínio da nota, reusando o vocabulário que já
+   existe antes de inventar termo novo:
+
+   ```bash
+   python3 scripts/vault.py tags "<caminho-do-vault>"
+   ```
+
 5. **Extraia aprendizados permanentes.** Se um projeto rendeu um aprendizado com
    valor além dele, crie a nota em Knowledge e faça o Project **apontar** pra
    ela. Não copie o conhecimento pro Project.
@@ -116,9 +123,29 @@ Knowledge própria — quase sempre deveria.
 gigantes que tentam explicar assuntos completamente diferentes. Uma nota pode
 (e deve) ter muitos links.
 
-**Tags com moderação.** Não crie tag pra cada conceito — se a relação já pode ser
-representada por um link/uma nota, prefira o link. Tags servem pra cortes
-transversais amplos (ex: `#revisar`), não pra substituir a rede de links.
+**Tags são o eixo de domínio; links são o eixo de relação.** Os dois convivem e
+respondem a perguntas diferentes. O link liga *duas notas específicas* ("este
+projeto usa [[OAuth 2.0]]"); a tag diz *a que domínio amplo a nota pertence*, e
+é o que a pasta faria se o vault fosse hierárquico — só que atravessando os
+tipos de nota. `Runbook Homeserver` (Project) e `Docker Compose Override`
+(Knowledge) vivem em pastas diferentes e compartilham a tag `docker`; é ela que
+responde "o que eu já sei sobre Docker?".
+
+Como taguear, na prática:
+
+- **Toda nota de Project e Knowledge recebe tag** — de 1 a 4, no campo `tags:`
+  do frontmatter (nunca inline no corpo). Zero tag é quase sempre erro.
+- **A tag é o domínio, não o assunto da nota.** Uma nota `Docker Compose` recebe
+  `docker`, não `docker-compose` — tag que serve a uma nota só não agrupa nada,
+  e esse papel o próprio título já cumpre. Na dúvida, use o balde mais largo que
+  ainda seja verdadeiro.
+- **Reuse antes de inventar.** Rode `vault.py tags` e escolha do vocabulário
+  existente; só crie tag nova quando nenhuma servir. O risco real não é ter
+  tags demais, é ter `docker`, `containers` e `conteinerizacao` convivendo.
+- **Formato:** minúsculas, sem acento, palavras ligadas por hífen — `docker`,
+  `postgresql`, `spring-boot`, `homeserver`. (Exceção às formas canônicas: o
+  Obsidian não aceita espaço em tag e trata caixa de forma inconsistente.)
+- Tags de **status** (`revisar`, `wip`) não são permitidas, esse tipo de informação deve ir para Daily
 
 **Frontmatter com propósito.** O frontmatter de cada tipo já vem do template do
 vault (`<vault>/templates/`) — respeite-o. Só adicione uma propriedade extra se
@@ -152,5 +179,6 @@ queira reforçar depois.
   (ou renderize com `vault.py template`) antes de criar/editar notas; esta skill
   não guarda templates próprios.
 - `scripts/vault.py` — helper para localizar pastas, achar notas existentes
-  (evitar duplicar), renderizar templates do vault e gerenciar a Daily.
+  (evitar duplicar), listar o vocabulário de tags, renderizar templates do
+  vault e gerenciar a Daily.
   `python3 scripts/vault.py -h` lista os subcomandos.

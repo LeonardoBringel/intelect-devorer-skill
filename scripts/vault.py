@@ -18,6 +18,7 @@ Sem dependências externas — só a biblioteca padrão do Python 3.
 
 Uso:
   python vault.py find     <vault> "<termo>"
+  python vault.py tags     <vault> ["<termo>"]   # vocabulário de tags já em uso
   python vault.py template <vault> <daily|dump|knowledge|project> [--date YYYY-MM-DD]
   python vault.py daily    <vault> [--date YYYY-MM-DD]
   python vault.py log      <vault> "<Título da nota>" "<descrição curta>" [--section Projetos|Aprendizados|Outros] [--date YYYY-MM-DD]
@@ -129,8 +130,13 @@ def iter_notes(vault: str):
                 yield os.path.join(root, f), f[:-3]
 
 
-def read_aliases(path: str):
-    """Lê o campo `aliases` do frontmatter, se houver."""
+def read_frontmatter_list(path: str, key: str):
+    """Lê um campo de lista do frontmatter (`aliases`, `tags`…), se houver.
+
+    Aceita as duas formas que o Obsidian escreve:  `key: [a, b]`  e
+    `key:` seguido de itens `  - a`. Os itens só contam até a próxima chave
+    do frontmatter, para que `tags:` e `aliases:` não se misturem.
+    """
     try:
         with open(path, encoding="utf-8") as fh:
             text = fh.read()
@@ -139,17 +145,27 @@ def read_aliases(path: str):
     m = re.match(r"^---\n(.*?)\n---", text, re.DOTALL)
     if not m:
         return []
-    block = m.group(1)
-    aliases = []
-    # aliases: [a, b]  |  aliases:\n  - a\n  - b
-    inline = re.search(r"^aliases:\s*\[(.*?)\]", block, re.MULTILINE)
-    if inline:
-        aliases += [a.strip().strip("\"'") for a in inline.group(1).split(",") if a.strip()]
-    listform = re.findall(r"^\s*-\s*(.+)$", block, re.MULTILINE)
-    # só considera itens de lista que estejam sob "aliases:"
-    if re.search(r"^aliases:\s*$", block, re.MULTILINE):
-        aliases += [a.strip().strip("\"'") for a in listform]
-    return [a for a in aliases if a]
+
+    values = []
+    lines = m.group(1).splitlines()
+    for i, line in enumerate(lines):
+        inline = re.match(rf"^{re.escape(key)}:\s*\[(.*?)\]\s*$", line)
+        if inline:
+            values += [v.strip().strip("\"'") for v in inline.group(1).split(",")]
+            continue
+        if not re.match(rf"^{re.escape(key)}:\s*$", line):
+            continue
+        # forma de bloco: consome os itens de lista até a próxima chave
+        for item in lines[i + 1:]:
+            if re.match(r"^\s*-\s+", item):
+                values.append(item.split("-", 1)[1].strip().strip("\"'"))
+            elif item.strip():
+                break
+    return [v for v in values if v]
+
+
+def read_aliases(path: str):
+    return read_frontmatter_list(path, "aliases")
 
 
 def cmd_find(args):
@@ -255,6 +271,32 @@ def cmd_log(args):
     print(f"[ok] registrado na Daily de {args.date} (seção {args.section}): {entry}")
 
 
+def cmd_tags(args):
+    """Lista o vocabulário de tags já em uso, da mais frequente pra menos.
+
+    Serve pro mesmo papel que o `find` cumpre pras notas: reusar o que já
+    existe em vez de inventar uma variante (`docker` vs `containers`).
+    """
+    counts = {}
+    for path, _title in iter_notes(args.vault):
+        for tag in read_frontmatter_list(path, "tags"):
+            counts[tag] = counts.get(tag, 0) + 1
+
+    if not counts:
+        print("NENHUMA tag em uso ainda — o vocabulário começa agora.")
+        return
+
+    if args.term:
+        term = args.term.lower()
+        counts = {t: n for t, n in counts.items() if term in t.lower()}
+        if not counts:
+            print(f"NENHUMA tag existente casa com '{args.term}'.")
+            return
+
+    for tag, n in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0])):
+        print(f"  {n:3}  {tag}")
+
+
 def cmd_folder(args):
     print(resolve_folder(args.vault, args.prefix))
 
@@ -300,6 +342,11 @@ def main():
     sp.add_argument("--section", choices=DAILY_SECTIONS, default="Outros")
     sp.add_argument("--date", default=today())
     sp.set_defaults(func=cmd_log)
+
+    sp = sub.add_parser("tags", help="lista o vocabulário de tags em uso")
+    sp.add_argument("vault")
+    sp.add_argument("term", nargs="?", default="")
+    sp.set_defaults(func=cmd_tags)
 
     sp = sub.add_parser("folder", help="resolve pasta pelo prefixo (00..05)")
     sp.add_argument("vault")
