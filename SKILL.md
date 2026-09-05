@@ -139,6 +139,13 @@ Quando o usuário quiser persistir algo, siga este raciocínio (nem todo passo s
 
 9. **Arquivos → `resources`.** Se o conhecimento vem com um arquivo (pdf, ppt…), coloque-o em `resources/` e referencie a partir da nota relevante (`![[palestra.pdf]]` ou `[[palestra.pdf]]`). Links pra fontes externas ficam dentro da nota, não em `resources`.
 
+10. **Versione o vault.** Depois que **todas** as notas da sessão estiverem criadas, formatadas, linteadas e registradas na Daily — nunca antes:
+```bash
+python3 scripts/vault.py commit "<caminho-do-vault>"
+```
+
+    O commit é **um por sessão, não um por nota**: uma anotação costuma tocar a nota nova, o Project e a Daily de uma vez, e commitar cada arquivo separado quebraria em pedaços algo que só faz sentido junto. Se a sessão não mudou nada, o script diz isso e não cria commit vazio. Se o vault ainda não for um repositório git, ele avisa — não rode `git init` sem o usuário pedir.
+
 ## Como escrever
 
 A nota existe para ser **reencontrada**, não lida de ponta a ponta. Quem chega nela daqui a seis meses quer a informação em segundos — texto a mais é custo de recuperação, não generosidade.
@@ -201,9 +208,9 @@ Como taguear, na prática:
 
 ## Ao terminar
 
-Feche o loop em uma linha: o que foi criado/atualizado, onde, e os principais links criados. Isso deixa o usuário confiar que a rede está crescendo de forma coerente — e perceber conexões que talvez queira reforçar depois.
+Rode o `vault.py commit` e feche o loop em uma linha: o que foi criado/atualizado, onde, e os principais links criados. Isso deixa o usuário confiar que a rede está crescendo de forma coerente — e perceber conexões que talvez queira reforçar depois.
 
 ## Referências
 
 - `<vault>/templates/` — a fonte de verdade do layout de cada tipo de nota (frontmatter + seções). Sob controle do usuário, no próprio Obsidian. Leia (ou renderize com `vault.py template`) antes de criar/editar notas; esta skill não guarda templates próprios.
-- `scripts/vault.py` — helper para derivar slug, localizar pastas, achar notas existentes (evitar duplicar), criar nota nova no lugar certo, listar o vocabulário de tags, renderizar templates do vault, normalizar a formatação (`fmt`), auditar o padrão (`lint`) e gerenciar a Daily. `python3 scripts/vault.py -h` lista os subcomandos.
+- `scripts/vault.py` — helper para derivar slug, localizar pastas, achar notas existentes (evitar duplicar), criar nota nova no lugar certo, listar o vocabulário de tags, renderizar templates do vault, normalizar a formatação (`fmt`), auditar o padrão (`lint`), gerenciar a Daily e versionar o vault num commit único (`commit`). `python3 scripts/vault.py -h` lista os subcomandos.

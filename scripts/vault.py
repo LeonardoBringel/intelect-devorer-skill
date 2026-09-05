@@ -11,6 +11,7 @@ reinvente essa lógica (e não erre) a cada anotação:
   - criar nota nova já no lugar certo, com nome e links corretos
   - garantir/abrir a nota do dia (Daily), sempre a partir do template do vault
   - registrar uma entrada na Daily sem duplicar linhas
+  - versionar o vault num commit único ao fim da sessão
   - apontar o que está fora do padrão (`lint`)
 
 Os templates NÃO são definidos aqui. Este script sempre lê os arquivos em
@@ -29,6 +30,7 @@ Uso:
   python vault.py template <vault> <daily|dump|project|task|lesson|knowledge> [--title "<Título>"] [--date YYYY-MM-DD]
   python vault.py daily    <vault> [--date YYYY-MM-DD]
   python vault.py log      <vault> "<Título ou slug>" "<descrição curta>" [--section Projetos|Aprendizados|"Outras notas"] [--date YYYY-MM-DD]
+  python vault.py commit   <vault>               # versiona tudo num commit só (fim da sessão)
   python vault.py folder   <vault> <papel>       # imprime o caminho da pasta pelo papel
   python vault.py tree     <vault>               # visão rápida da estrutura
   python vault.py version                        # versão da skill (vai pro frontmatter)
@@ -39,6 +41,7 @@ import datetime as dt
 import difflib
 import os
 import re
+import subprocess
 import sys
 import unicodedata
 
@@ -752,6 +755,54 @@ def cmd_fmt(args):
         sys.exit(1)
 
 
+# --- Versionamento -----------------------------------------------------------
+
+
+def _git(vault: str, *argv: str):
+    """Roda um comando git dentro do vault e devolve o resultado."""
+    return subprocess.run(["git", "-C", vault, *argv], capture_output=True, text=True)
+
+
+def cmd_commit(args):
+    """Versiona de uma vez tudo que a sessão mexeu no vault.
+
+    É um commit por sessão, no fim de todas as edições — nunca um por nota:
+    uma anotação costuma tocar várias notas (a nota em si, o projeto, a Daily),
+    e commitar cada uma separada quebraria em pedaços algo que só faz sentido
+    junto. A mensagem é só o timestamp `yyyy-mm-dd-hh-mm-ss`, porque o histórico
+    do vault é uma linha do tempo — o "o quê" de cada dia já está na Daily.
+    """
+    vault = args.vault
+    if not os.path.isdir(vault):
+        sys.exit(f"[erro] vault não encontrado: {vault}")
+
+    if _git(vault, "rev-parse", "--is-inside-work-tree").returncode != 0:
+        sys.exit(
+            f"[erro] o vault não é um repositório git: {vault}\n"
+            f'       rode `git -C "{vault}" init` antes de versionar.'
+        )
+
+    add = _git(vault, "add", "-A")
+    if add.returncode != 0:
+        sys.exit(f"[erro] git add falhou: {add.stderr.strip()}")
+
+    if _git(vault, "diff", "--cached", "--quiet").returncode == 0:
+        print("[ok] nada a commitar — o vault já está versionado.")
+        return
+
+    files = [f for f in _git(vault, "diff", "--cached", "--name-only").stdout.splitlines() if f]
+    message = dt.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+
+    commit = _git(vault, "commit", "-m", message)
+    if commit.returncode != 0:
+        sys.exit(f"[erro] git commit falhou: {(commit.stderr or commit.stdout).strip()}")
+
+    short = _git(vault, "rev-parse", "--short", "HEAD").stdout.strip()
+    print(f"[ok] commit {short} ({message}) — {len(files)} arquivo(s):")
+    for f in files:
+        print(f"  {f}")
+
+
 def cmd_folder(args):
     print(resolve_folder(args.vault, args.role))
 
@@ -840,6 +891,10 @@ def main():
     sp = sub.add_parser("lint", help="aponta nomenclatura, frontmatter e links fora do padrão")
     sp.add_argument("vault")
     sp.set_defaults(func=cmd_lint)
+
+    sp = sub.add_parser("commit", help="versiona o vault num commit único (fim da sessão)")
+    sp.add_argument("vault")
+    sp.set_defaults(func=cmd_commit)
 
     sp = sub.add_parser("folder", help="resolve a pasta pelo papel (dump, projects, lessons…)")
     sp.add_argument("vault")
