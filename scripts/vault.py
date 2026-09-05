@@ -23,7 +23,7 @@ Sem dependências externas — só a biblioteca padrão do Python 3.
 Uso:
   python vault.py slug     "<título>"
   python vault.py find     <vault> "<termo>"
-  python vault.py new      <vault> <project|task|lesson|knowledge|dump> "<Título>" [--project <slug>] [--source <url>] [--progress "<síntese>"]
+  python vault.py new      <vault> <project|task|lesson|knowledge|dump> "<Título>" [--project <slug>] [--progress "<síntese>"]
   python vault.py fmt      <arquivo|pasta|vault> [--check]   # normaliza a forma das notas
   python vault.py lint     <vault>               # nomenclatura, frontmatter e links fora do padrão
   python vault.py tags     <vault> ["<termo>"]   # vocabulário de tags já em uso
@@ -365,6 +365,9 @@ def cmd_new(args):
     if not note_slug:
         sys.exit(f"[erro] título não gera um slug válido: '{title}'")
 
+    if args.project and args.kind != "task":
+        sys.exit(f"[erro] --project só vale para `new task` (recebido em `new {args.kind}`).")
+
     if args.kind == "task":
         if not args.project:
             sys.exit("[erro] `new task` exige --project <slug do projeto>.")
@@ -384,13 +387,6 @@ def cmd_new(args):
         return
 
     body = render_template(load_template(args.vault, args.kind), args.date, title)
-    if args.kind == "lesson":
-        if args.project:
-            main = project_main(args.vault, args.project)
-            body = stamp(body, "project", f'"{wikilink(args.project, note_title(main, args.project))}"')
-    if args.kind == "knowledge" and args.source:
-        body = stamp(body, "source", args.source)
-
     folder = resolve_folder(args.vault, KIND_FOLDER[args.kind])
     if args.kind == "project":
         path = os.path.join(folder, note_slug, f"{note_slug}.md")
@@ -563,10 +559,6 @@ def cmd_lint(args):
             issues.append((rel, "frontmatter sem `title`"))
         if kind in ("project", "lesson", "knowledge") and not read_frontmatter_list(path, "tags"):
             issues.append((rel, "frontmatter sem `tags`"))
-        if kind == "lesson" and not read_frontmatter_value(path, "project"):
-            issues.append((rel, "lesson sem `project` — de qual projeto veio o aprendizado?"))
-        if kind == "knowledge" and not read_frontmatter_value(path, "source"):
-            issues.append((rel, "knowledge sem `source` — de onde veio o estudo?"))
         if kind == "task" and not read_frontmatter_value(path, "project"):
             issues.append((rel, "task sem `project`"))
 
@@ -848,8 +840,7 @@ def main():
     sp.add_argument("vault")
     sp.add_argument("kind", choices=["project", "task", "lesson", "knowledge", "dump"])
     sp.add_argument("title")
-    sp.add_argument("--project", default="", help="slug do projeto (task e lesson)")
-    sp.add_argument("--source", default="", help="fonte do estudo (knowledge)")
+    sp.add_argument("--project", default="", help="slug do projeto (obrigatório em task)")
     sp.add_argument("--progress", default="", help="síntese do bullet de Progresso (task)")
     sp.add_argument("--no-progress", action="store_true", help="não registra o bullet no projeto")
     sp.add_argument("--date", default=today())

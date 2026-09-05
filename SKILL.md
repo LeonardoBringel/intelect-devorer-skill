@@ -105,7 +105,7 @@ Quando o usuário quiser persistir algo, siga este raciocínio (nem todo passo s
 4. **Crie a nota pelo helper**, nunca escrevendo o caminho à mão — ele garante slug, pasta e frontmatter corretos:
 
    ```bash
-   python3 scripts/vault.py new "<vault>" <project|task|lesson|knowledge|dump> "<Título>" [--project <slug>] [--source <url>]
+   python3 scripts/vault.py new "<vault>" <project|task|lesson|knowledge|dump> "<Título>" [--project <slug-do-projeto>]
    ```
 
 5. **Preencha o conteúdo.** Escreva seguindo **[Como escrever](#como-escrever)**, com links no corpo pros conceitos citados. Não altere as seções nem o frontmatter definidos pelo template.
@@ -127,7 +127,7 @@ Quando o usuário quiser persistir algo, siga este raciocínio (nem todo passo s
    python3 scripts/vault.py lint "<caminho-do-vault>"
    ```
 
-   O `fmt` desfaz hard wrap, insere o `---` faltante sob cada cabeçalho e normaliza as linhas em branco. O `lint` pega o que a forma não pega: nome fora do padrão, `title`/`tags`/`project`/`source` faltando, link fora do kebab e projeto sem `tasks/`. Link para nota que ainda não existe ele reporta como `[pendente]`, não como erro — é uso legítimo do Obsidian. Densidade textual nenhum dos dois resolve: isso é julgamento seu, e está em [Como escrever](#como-escrever).
+   O `fmt` desfaz hard wrap, insere o `---` faltante sob cada cabeçalho e normaliza as linhas em branco. O `lint` pega o que a forma não pega: nome fora do padrão, `title`/`tags` faltando, task sem `project`, link fora do kebab e projeto sem `tasks/`. Link para nota que ainda não existe ele reporta como `[pendente]`, não como erro — é uso legítimo do Obsidian. Densidade textual nenhum dos dois resolve: isso é julgamento seu, e está em [Como escrever](#como-escrever).
 
 8. **Registre na Daily.** Para cada nota tocada:
 
