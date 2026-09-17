@@ -9,7 +9,6 @@ o resultado depois:
   - listar o vocabulário de tags em uso (evitar sinônimos)          -> `tags`
   - normalizar a forma da nota (unwrap + divider sob cabeçalho)     -> `fmt`
   - auditar o vault contra os templates e as convenções            -> `lint`
-  - versionar o vault num commit único ao fim da sessão            -> `commit`
 
 `lint` é o portão: sai com código ≠ 0 quando encontra erro, e usa os arquivos
 em `<vault>/templates/` como fonte de verdade. Editar um template no Obsidian
@@ -27,15 +26,12 @@ Uso:
   python vault.py tags   <vault> ["<termo>"]   # vocabulário de tags já em uso
   python vault.py fmt    <arquivo|pasta|vault> [--check]
   python vault.py lint   <vault>               # portão: exit ≠ 0 se houver erro
-  python vault.py commit <vault>               # versiona tudo num commit só
 """
 
 import argparse
-import datetime as dt
 import difflib
 import os
 import re
-import subprocess
 import sys
 import unicodedata
 
@@ -649,55 +645,6 @@ def cmd_fmt(args):
         sys.exit(1)
 
 
-# --- Versionamento -----------------------------------------------------------
-
-
-def _git(vault: str, *argv: str):
-    """Roda um comando git dentro do vault e devolve o resultado."""
-    return subprocess.run(["git", "-C", vault, *argv], capture_output=True, text=True)
-
-
-def cmd_commit(args):
-    """Versiona de uma vez tudo que a sessão mexeu no vault.
-
-    É um commit por sessão, no fim de todas as edições — nunca um por nota:
-    uma anotação costuma tocar várias notas (a nota em si, o projeto, a Daily),
-    e commitar cada uma separada quebraria em pedaços algo que só faz sentido
-    junto. A mensagem é só o timestamp `yyyy-mm-dd-hh-mm-ss`, porque o histórico
-    do vault é uma linha do tempo — o "o quê" de cada dia já está na Daily.
-    """
-    vault = args.vault
-    if not os.path.isdir(vault):
-        sys.exit(f"[erro] vault não encontrado: {vault}")
-
-    if _git(vault, "rev-parse", "--is-inside-work-tree").returncode != 0:
-        sys.exit(
-            f"[erro] o vault não é um repositório git: {vault}\n"
-            f"       versionar o vault é decisão do usuário: reporte e pare, "
-            f"não rode `git init`."
-        )
-
-    add = _git(vault, "add", "-A")
-    if add.returncode != 0:
-        sys.exit(f"[erro] git add falhou: {add.stderr.strip()}")
-
-    if _git(vault, "diff", "--cached", "--quiet").returncode == 0:
-        print("[ok] nada a commitar — o vault já está versionado.")
-        return
-
-    files = [f for f in _git(vault, "diff", "--cached", "--name-only").stdout.splitlines() if f]
-    message = dt.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-
-    commit = _git(vault, "commit", "-m", message)
-    if commit.returncode != 0:
-        sys.exit(f"[erro] git commit falhou: {(commit.stderr or commit.stdout).strip()}")
-
-    short = _git(vault, "rev-parse", "--short", "HEAD").stdout.strip()
-    print(f"[ok] commit {short} ({message}) — {len(files)} arquivo(s):")
-    for f in files:
-        print(f"  {f}")
-
-
 def main():
     p = argparse.ArgumentParser(description="Utilitário do vault second brain.")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -720,10 +667,6 @@ def main():
     sp = sub.add_parser("lint", help="audita o vault contra os templates (exit ≠ 0 se houver erro)")
     sp.add_argument("vault")
     sp.set_defaults(func=cmd_lint)
-
-    sp = sub.add_parser("commit", help="versiona o vault num commit único (fim da sessão)")
-    sp.add_argument("vault")
-    sp.set_defaults(func=cmd_commit)
 
     args = p.parse_args()
     args.func(args)

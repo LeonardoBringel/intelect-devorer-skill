@@ -22,8 +22,7 @@ Cada passo carrega sua rule **no momento do passo**, não na ativação da skill
 - [ ] 4. Escrever o corpo → `rules/escrita.md`
 - [ ] 5. Conectar: Progresso, Aprendizados, Daily → `rules/registro.md`
 - [ ] 6. Validar → `vault.py fmt` + `vault.py lint`, em loop até verde
-- [ ] 7. Commit único da sessão → `vault.py commit`
-- [ ] 8. Fechar o loop com o usuário → uma linha: o que foi criado ou atualizado, em que pasta, e os wikilinks principais
+- [ ] 7. Fechar o loop com o usuário → uma linha: o que foi criado ou atualizado, em que pasta, e os wikilinks principais
 ```
 
 O fluxo vale igual para nota nova e para edição: quando o passo 2 devolve resultado, o passo 3 vira abrir o arquivo que voltou e o passo 4 continua idêntico.
@@ -45,12 +44,9 @@ Valem em todo passo, por isso ficam aqui e não numa rule:
 - **`llm_model_used` só o modelo sabe responder**: preencha com o nome do modelo que está escrevendo agora.
 - **`created` nunca muda em nota existente**, por mais que ela seja reescrita inteira; `updated` passa a ser o dia da edição. A data de hoje vem de `date +%F` uma vez por sessão, nunca de memória.
 - **`dump` não é destino permanente**: é trampolim para uma nota de `projects`, `lessons` ou `knowledge`. `archives` só recebe por decisão explícita do usuário, e nenhum arquivo do vault é deletado — no máximo movido para lá.
-- **Um commit por sessão, no fim.** Uma anotação toca a nota, o Project e a Daily de uma vez; commitar cada arquivo separado parte em pedaços algo que só faz sentido junto.
-- **`commit` versiona o working tree inteiro**, não só o que a sessão tocou: olhe `git -C "<vault>" status` antes e, se houver mudança que não é desta sessão — edição pendente feita no Obsidian, por exemplo —, diga ao usuário em vez de varrê-la para dentro do commit, nunca limpe sem confirmar antes com o usuário.
 - **A Daily indexa, não guarda conhecimento**: wikilink mais uma linha de síntese. Se a entrada precisa de um parágrafo, o parágrafo pertence à nota linkada.
 - **Não crie pasta de nível superior nova.** As sete de `rules/classificacao.md` são o conjunto completo; o que parece não caber é `knowledge` ou é detalhe de um projeto.
 - **Arquivo binário vai para `resources/`** e é referenciado por embed da nota que o cita — `![[palestra.pdf]]`, com o `!`, senão vira link e não incorpora. Link para site fica dentro da nota que o usa, nunca em `resources`.
-- **Nunca rode `git init` no vault.** Se ele ainda não é repositório, `vault.py commit` avisa: reporte ao usuário e pare — versionar o vault é decisão dele.
 
 ## Scripts
 ---
@@ -62,4 +58,3 @@ Todos rodam do diretório da skill, com `python3 scripts/vault.py <sub>`, e `<va
 | `tags` | `tags "<vault>" [<termo>]` | lista o vocabulário de tags em uso, para reusar termo antes de inventar |
 | `fmt` | `fmt <alvo> [--check]` | normaliza a forma de nota, pasta ou vault inteiro: desfaz hard wrap e insere o `---` sob cada cabeçalho |
 | `lint` | `lint "<vault>"` | audita o vault contra os templates; sai com código ≠ 0 quando há erro |
-| `commit` | `commit "<vault>"` | versiona o vault num commit único, ao fim da sessão |
