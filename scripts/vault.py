@@ -1,39 +1,33 @@
 #!/usr/bin/env python3
 """Utilitário para o vault "second brain" do Obsidian.
 
-Cuida das partes deterministas e chatas do fluxo, para que o Claude não
-reinvente essa lógica (e não erre) a cada anotação:
+O script não cria notas — quem escreve é o agente. Aqui ficam só as partes
+deterministas que dão errado quando feitas de cabeça, e a auditoria que confere
+o resultado depois:
 
-  - resolver as pastas do vault de forma tolerante a variações
-  - derivar o slug canônico de um título (kebab-case, sem acento)
-  - achar se já existe uma nota para um conceito (evitar duplicar)
-  - renderizar um template do vault (a fonte de verdade dos templates)
-  - criar nota nova já no lugar certo, com nome e links corretos
-  - garantir/abrir a nota do dia (Daily), sempre a partir do template do vault
-  - registrar uma entrada na Daily sem duplicar linhas
-  - versionar o vault num commit único ao fim da sessão
-  - apontar o que está fora do padrão (`lint`)
+  - achar se já existe uma nota para um conceito (evitar duplicar)  -> `find`
+  - listar o vocabulário de tags em uso (evitar sinônimos)          -> `tags`
+  - normalizar a forma da nota (unwrap + divider sob cabeçalho)     -> `fmt`
+  - auditar o vault contra os templates e as convenções            -> `lint`
+  - versionar o vault num commit único ao fim da sessão            -> `commit`
 
-Os templates NÃO são definidos aqui. Este script sempre lê os arquivos em
-`<vault>/templates/` — assim a estrutura das notas fica sob controle do
-usuário, no próprio Obsidian, e nunca conflita com o que o script gera.
+`lint` é o portão: sai com código ≠ 0 quando encontra erro, e usa os arquivos
+em `<vault>/templates/` como fonte de verdade. Editar um template no Obsidian
+ajusta o lint sem tocar neste código — placeholder, chave de frontmatter e
+seção obrigatória saem todos de lá, não de uma lista fixa aqui dentro.
+
+Os templates NÃO são definidos aqui, e este script nunca os escreve.
+
+A versão da skill vive em `metadata.version` na frontmatter do `SKILL.md`.
 
 Sem dependências externas — só a biblioteca padrão do Python 3.
 
 Uso:
-  python vault.py slug     "<título>"
-  python vault.py find     <vault> "<termo>"
-  python vault.py new      <vault> <project|task|lesson|knowledge|dump> "<Título>" [--project <slug>] [--progress "<síntese>"]
-  python vault.py fmt      <arquivo|pasta|vault> [--check]   # normaliza a forma das notas
-  python vault.py lint     <vault>               # nomenclatura, frontmatter e links fora do padrão
-  python vault.py tags     <vault> ["<termo>"]   # vocabulário de tags já em uso
-  python vault.py template <vault> <daily|dump|project|task|lesson|knowledge> [--title "<Título>"] [--date YYYY-MM-DD]
-  python vault.py daily    <vault> [--date YYYY-MM-DD]
-  python vault.py log      <vault> "<Título ou slug>" "<descrição curta>" [--section Projetos|Aprendizados|"Outras notas"] [--date YYYY-MM-DD]
-  python vault.py commit   <vault>               # versiona tudo num commit só (fim da sessão)
-  python vault.py folder   <vault> <papel>       # imprime o caminho da pasta pelo papel
-  python vault.py tree     <vault>               # visão rápida da estrutura
-  python vault.py version                        # versão da skill (vai pro frontmatter)
+  python vault.py find   <vault> "<termo>"
+  python vault.py tags   <vault> ["<termo>"]   # vocabulário de tags já em uso
+  python vault.py fmt    <arquivo|pasta|vault> [--check]
+  python vault.py lint   <vault>               # portão: exit ≠ 0 se houver erro
+  python vault.py commit <vault>               # versiona tudo num commit só
 """
 
 import argparse
@@ -44,18 +38,6 @@ import re
 import subprocess
 import sys
 import unicodedata
-
-# Versão da skill, gravada em `skill_version` nas notas criadas. Serve para
-# responder depois "sob quais regras esta nota foi escrita?" — então precisa ser
-# um valor discreto e comparável, não algo derivado da árvore de trabalho.
-#
-# Declarada aqui de propósito, e NÃO lida do git: a cópia em execução da skill
-# pode não ser um checkout (`git describe` falharia), e numa árvore suja o git
-# devolveria o mesmo valor antes e depois de uma mudança de comportamento.
-#
-# Bump manual no release, junto com a tag git — mesma disciplina do
-# `template_version` dos templates do vault.
-SKILL_VERSION = "0.4.0"
 
 # Papel lógico -> nome canônico da pasta. Os nomes são kebab minúsculo, sem
 # numeração: a ordem do fluxo vive no SKILL.md, não no nome da pasta.
@@ -69,18 +51,6 @@ FOLDER_ROLE = [
     "archives",
 ]
 
-# Nomes numerados da estrutura anterior (`03 - Knowledge`), mantidos só para
-# uma cópia antiga do vault continuar resolvendo. `lessons` casa com o antigo
-# `03 - Knowledge` porque foi essa pasta que virou Lessons na migração.
-LEGACY_PREFIX = {
-    "dump": "00",
-    "daily": "01",
-    "projects": "02",
-    "lessons": "03",
-    "resources": "04",
-    "archives": "05",
-}
-
 # Tipos de nota -> nome do arquivo de template dentro de `<vault>/templates/`.
 # A correspondência é case-insensitive na hora de procurar.
 TEMPLATE_FILE = {
@@ -92,36 +62,28 @@ TEMPLATE_FILE = {
     "knowledge": "knowledge-template.md",
 }
 
-# Onde cada tipo de nota nasce. `task` fica de fora: mora dentro do projeto.
-KIND_FOLDER = {
-    "dump": "dump",
-    "project": "projects",
-    "lesson": "lessons",
-    "knowledge": "knowledge",
-}
+# Chaves de frontmatter que, quando o template daquele tipo as declara, precisam
+# chegar preenchidas na nota. A lista é um teto, não um piso: o template é quem
+# decide quais existem (`dump` não tem `tags`, `daily` não tem `title`).
+REQUIRED_WHEN_IN_TEMPLATE = [
+    "title",
+    "created",
+    "tags",
+    "project",
+]
 
-# Seções da Daily onde `log` pode inserir entradas. Devem bater com os
-# cabeçalhos `## ...` do `daily-template.md` do vault. `Pendentes` fica de fora
-# de propósito: lá vão checkboxes de tarefa, não registro de nota tocada.
-DAILY_SECTIONS = ["Projetos", "Aprendizados", "Outras notas"]
-
-# Nomes antigos de seção que ainda existem em daily já escritas. Sem isso, uma
-# daily criada quando a seção se chamava "Outros" ganharia uma segunda seção em
-# vez de receber a entrada na que já está lá.
-SECTION_ALIASES = {"Outras notas": ("outras notas", "outros")}
-
-# Linhas de exemplo dos templates que devem sair quando entra conteúdo real.
-PLACEHOLDER_LINES = {
-    "- wikilink - síntese da adição/modificação",
-    "- outras informações sobre o dia",
-    "- wikilinks",
-    "- wikilinks para as notas de lessons/ e knowledge/ que este projeto rendeu.",
-    "- yyyy-mm-dd: síntese do progresso. → [[slug-da-task|título da task]]",
-    "- yyyy-mm-dd: **decisão** — motivo.",
-    "-",
-}
+# Chaves que só um agente tem como preencher. Nota escrita à mão pelo usuário no
+# Obsidian não tem modelo a declarar nem versão de skill: vazio aqui quer dizer
+# "não houve agente", não "o agente esqueceu" — e preencher depois seria inventar
+# dado. O lint reporta como metadado, sem contar erro nem mexer no exit code.
+AGENT_ONLY_WHEN_IN_TEMPLATE = [
+    "skill_version",
+    "llm_model_used",
+]
 
 SLUG_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+DATE_PREFIX_RE = re.compile(r"^\d{4}-\d{2}-\d{2}-")
 
 # `[[alvo#âncora|texto]]` — âncora e texto opcionais. Link só de âncora
 # (`[[#Seção]]`) não casa, e é isso que queremos: ele é interno à nota.
@@ -140,16 +102,9 @@ def resolve_folder(vault: str, role: str) -> str:
     """Acha a pasta do papel pedido (`projects`, `lessons`…)."""
     if not os.path.isdir(vault):
         sys.exit(f"[erro] vault não encontrado: {vault}")
-    names = sorted(os.listdir(vault))
-    for name in names:
+    for name in sorted(os.listdir(vault)):
         if os.path.isdir(os.path.join(vault, name)) and name.strip().lower() == role:
             return os.path.join(vault, name)
-    prefix = LEGACY_PREFIX.get(role)
-    if prefix:
-        for name in names:
-            full = os.path.join(vault, name)
-            if os.path.isdir(full) and name.strip().startswith(prefix):
-                return full
     sys.exit(
         f"[erro] não encontrei a pasta '{role}' em {vault}. "
         f"O vault segue a estrutura {', '.join(FOLDER_ROLE)}?"
@@ -183,28 +138,6 @@ def load_template(vault: str, kind: str) -> str:
         f"[erro] template de '{kind}' não encontrado em {tdir} "
         f"(esperado: '{TEMPLATE_FILE[kind]}')."
     )
-
-
-def stamp(text: str, key: str, value: str) -> str:
-    """Preenche uma chave do frontmatter, se ela existir no template.
-
-    Nunca cria a chave: o template do vault decide quais campos existem em
-    cada tipo de nota — o Dump, por exemplo, não tem `skill_version`.
-    """
-    return re.sub(rf"(?m)^{re.escape(key)}:.*$", lambda _m: f"{key}: {value}", text, count=1)
-
-
-def render_template(text: str, date: str, title: str = "") -> str:
-    """Preenche os campos que o script sabe responder sozinho.
-
-    Estampar aqui é deliberado: são os campos que não dependem de o modelo
-    lembrar de preenchê-los. `llm_model_used` fica de fora — só o modelo sabe.
-    """
-    text = stamp(text, "created", date)
-    text = stamp(text, "skill_version", f'"{SKILL_VERSION}"')
-    if title:
-        text = stamp(text, "title", title)
-    return text
 
 
 def _templates_dir_or_none(vault: str):
@@ -291,8 +224,33 @@ def wikilink(note_slug: str, title: str) -> str:
     return f"[[{note_slug}]]" if title == note_slug else f"[[{note_slug}|{title}]]"
 
 
-def cmd_slug(args):
-    print(slugify(args.text))
+def split_frontmatter(text: str):
+    """Separa o frontmatter YAML do corpo. O frontmatter nunca é reformatado."""
+    m = re.match(r"^---\n.*?\n---\n?", text, re.DOTALL)
+    if not m:
+        return "", text
+    return m.group(0), text[m.end():]
+
+
+def _section_bounds(lines, section: str):
+    """Retorna (inicio, fim) das linhas de conteúdo sob o cabeçalho `## <section>`.
+
+    `inicio` já pula a linha separadora `---` logo abaixo do cabeçalho, se houver.
+    Retorna (None, None) se a seção não existe no arquivo.
+    """
+    target = f"## {section.strip().lower()}"
+    hdr = next((i for i, ln in enumerate(lines) if ln.strip().lower() == target), None)
+    if hdr is None:
+        return None, None
+    start = hdr + 1
+    if start < len(lines) and lines[start].strip() == "---":
+        start += 1
+    end = len(lines)
+    for j in range(start, len(lines)):
+        if lines[j].startswith("## "):
+            end = j
+            break
+    return start, end
 
 
 def cmd_find(args):
@@ -315,181 +273,6 @@ def cmd_find(args):
                 print(f"  {wikilink(note_slug, title)}  ->  {rel}")
     if not exact and not partial:
         print("NENHUMA nota encontrada — provavelmente é uma nota nova a criar.")
-
-
-def cmd_template(args):
-    """Imprime o template do vault já renderizado (útil para criar notas)."""
-    print(render_template(load_template(args.vault, args.kind), args.date, args.title), end="")
-
-
-# --- Criação de notas --------------------------------------------------------
-
-
-def project_main(vault: str, project_slug: str) -> str:
-    """Caminho da nota principal de um projeto: `projects/<slug>/<slug>.md`."""
-    path = os.path.join(resolve_folder(vault, "projects"), project_slug, f"{project_slug}.md")
-    if not os.path.isfile(path):
-        sys.exit(f"[erro] projeto '{project_slug}' não encontrado (esperado: {path}).")
-    return path
-
-
-def _write_new(path: str, body: str):
-    if os.path.exists(path):
-        sys.exit(f"[erro] já existe: {path}")
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w", encoding="utf-8") as fh:
-        fh.write(body)
-    print(path)
-
-
-def _append_to_section(path: str, section: str, entry: str):
-    """Insere uma linha no fim da seção, tirando os placeholders do template."""
-    with open(path, encoding="utf-8") as fh:
-        lines = fh.read().splitlines()
-    start, end = _section_bounds(lines, section)
-    if start is None:
-        sys.exit(f"[erro] seção '{section}' não encontrada em {path}.")
-    body = [
-        ln for ln in lines[start:end]
-        if ln.strip() and ln.strip().lower() not in PLACEHOLDER_LINES
-    ]
-    body.append(entry)
-    with open(path, "w", encoding="utf-8") as fh:
-        fh.write("\n".join(lines[:start] + body + [""] + lines[end:]).rstrip("\n") + "\n")
-
-
-def cmd_new(args):
-    """Cria a nota no lugar certo, com slug canônico e links já montados."""
-    title = args.title.strip()
-    note_slug = slugify(title)
-    if not note_slug:
-        sys.exit(f"[erro] título não gera um slug válido: '{title}'")
-
-    if args.project and args.kind != "task":
-        sys.exit(f"[erro] --project só vale para `new task` (recebido em `new {args.kind}`).")
-
-    if args.kind == "task":
-        if not args.project:
-            sys.exit("[erro] `new task` exige --project <slug do projeto>.")
-        main = project_main(args.vault, args.project)
-        proj_title = note_title(main, args.project)
-        task_slug = f"{args.date}-{note_slug}"
-        body = render_template(load_template(args.vault, "task"), args.date, title)
-        body = stamp(body, "project", f'"{wikilink(args.project, proj_title)}"')
-        _write_new(os.path.join(os.path.dirname(main), "tasks", f"{task_slug}.md"), body)
-        if not args.no_progress:
-            synthesis = args.progress or title
-            _append_to_section(
-                main, "Progresso",
-                f"- {args.date}: {synthesis} → {wikilink(task_slug, title)}",
-            )
-            print(f"[ok] progresso registrado em {os.path.relpath(main, args.vault)}")
-        return
-
-    body = render_template(load_template(args.vault, args.kind), args.date, title)
-    folder = resolve_folder(args.vault, KIND_FOLDER[args.kind])
-    if args.kind == "project":
-        path = os.path.join(folder, note_slug, f"{note_slug}.md")
-        os.makedirs(os.path.join(folder, note_slug, "tasks"), exist_ok=True)
-    else:
-        path = os.path.join(folder, f"{note_slug}.md")
-    _write_new(path, body)
-
-
-# --- Daily -------------------------------------------------------------------
-
-
-def daily_path(vault: str, date: str) -> str:
-    return os.path.join(resolve_folder(vault, "daily"), f"{date}.md")
-
-
-def ensure_daily(vault: str, date: str) -> str:
-    """Garante que a nota do dia exista, criada a partir do `daily-template.md` do vault."""
-    path = daily_path(vault, date)
-    if not os.path.exists(path):
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        body = render_template(load_template(vault, "daily"), date)
-        with open(path, "w", encoding="utf-8") as fh:
-            fh.write(body)
-    return path
-
-
-def cmd_daily(args):
-    print(ensure_daily(args.vault, args.date))
-
-
-def _section_bounds(lines, section: str):
-    """Retorna (inicio, fim) das linhas de conteúdo sob o cabeçalho `## <section>`.
-
-    `inicio` já pula a linha separadora `---` logo abaixo do cabeçalho, se houver.
-    Retorna (None, None) se a seção não existe no arquivo.
-    """
-    names = SECTION_ALIASES.get(section, (section.lower(),))
-    targets = {f"## {n}" for n in names}
-    hdr = next((i for i, ln in enumerate(lines) if ln.strip().lower() in targets), None)
-    if hdr is None:
-        return None, None
-    start = hdr + 1
-    if start < len(lines) and lines[start].strip() == "---":
-        start += 1
-    end = len(lines)
-    for j in range(start, len(lines)):
-        if lines[j].startswith("## "):
-            end = j
-            break
-    return start, end
-
-
-def resolve_note(vault: str, term: str):
-    """Resolve um termo (slug, título ou alias) em (slug, título) da nota."""
-    term_l = term.lower().strip()
-    term_slug = slugify(term)
-    for path, note_slug in iter_notes(vault):
-        title = note_title(path, note_slug)
-        names = [note_slug.lower(), title.lower()] + [a.lower() for a in read_aliases(path)]
-        if term_l in names or term_slug == note_slug.lower():
-            return note_slug, title
-    return term_slug, term
-
-
-def cmd_log(args):
-    """Registra `- [[slug|Título]] — descrição` na seção pedida da Daily, sem duplicar."""
-    path = ensure_daily(args.vault, args.date)
-    note_slug, title = resolve_note(args.vault, args.title)
-    entry = f"- {wikilink(note_slug, title)}"
-    if args.description:
-        entry += f" — {args.description}"
-
-    with open(path, encoding="utf-8") as fh:
-        content = fh.read()
-
-    # dedupe: se já existe uma linha para essa mesma nota em qualquer seção, não repete
-    if re.search(rf"(?m)^- \[\[{re.escape(note_slug)}[\]|]", content):
-        print(f"[ok] entrada para [[{note_slug}]] já existe na Daily de {args.date} — nada a fazer.")
-        return
-
-    lines = content.splitlines()
-    start, end = _section_bounds(lines, args.section)
-
-    if start is None:
-        # o template do vault não tem essa seção — anexa uma no fim
-        block = ["", f"## {args.section}", "---", entry]
-        new = "\n".join(lines + block).rstrip("\n") + "\n"
-    else:
-        body = [
-            ln for ln in lines[start:end]
-            if ln.strip() and ln.strip().lower() not in PLACEHOLDER_LINES
-        ]
-        body.append(entry)
-        new = "\n".join(lines[:start] + body + [""] + lines[end:]).rstrip("\n") + "\n"
-
-    with open(path, "w", encoding="utf-8") as fh:
-        fh.write(new)
-    print(f"[ok] registrado na Daily de {args.date} (seção {args.section}): {entry}")
-
-
-def cmd_version(args):
-    print(SKILL_VERSION)
 
 
 def cmd_tags(args):
@@ -519,6 +302,11 @@ def cmd_tags(args):
 
 
 # --- Lint --------------------------------------------------------------------
+#
+# O lint é o backstop do fluxo: o agente escreve a nota à mão e o lint confere o
+# resultado contra o template do vault. Tudo que ele sabe sobre "como a nota
+# deveria ser" vem de `<vault>/templates/` — nada de lista fixa aqui, que
+# dessincroniza na primeira vez que o usuário mexe num template no Obsidian.
 
 
 def strip_code(text: str) -> str:
@@ -531,10 +319,103 @@ def strip_code(text: str) -> str:
     return re.sub(r"`[^`\n]*`", "", text)
 
 
+_TEMPLATE_CACHE: dict = {}
+
+
+def template_text(vault: str, kind: str):
+    """Texto do template daquele tipo, ou None se o vault não tiver esse arquivo.
+
+    O lint nunca aborta por template ausente: ele só perde as checagens que
+    dependem daquele tipo e segue auditando o resto do vault.
+    """
+    if kind not in _TEMPLATE_CACHE:
+        try:
+            _TEMPLATE_CACHE[kind] = load_template(vault, kind)
+        except SystemExit:
+            _TEMPLATE_CACHE[kind] = None
+    return _TEMPLATE_CACHE[kind]
+
+
+def _body_lines(text: str):
+    """Linhas de conteúdo do corpo, sem cabeçalho, divider nem linha em branco.
+
+    Devolve (numero_da_linha_no_arquivo, texto_normalizado, texto_literal). A
+    normalização é trim + minúsculas: é ela que faz a comparação nota ↔ template
+    sobreviver a um espaço a mais ou a uma maiúscula trocada. O literal vai junto
+    porque é ele que a mensagem de erro imprime — o usuário precisa achar a linha
+    no Obsidian buscando o texto exato, não a versão minusculada.
+    """
+    front, body = split_frontmatter(text)
+    offset = front.count("\n")
+    out = []
+    for i, raw in enumerate(body.split("\n")):
+        s = raw.strip()
+        if not s or s.startswith("#") or set(s) == {"-"}:
+            continue
+        out.append((offset + i + 1, s.lower(), s))
+    return out
+
+
+def _template_sections(text: str):
+    """Cabeçalhos `## ...` que o template exige (na ordem em que aparecem)."""
+    _front, body = split_frontmatter(text)
+    return [ln.strip()[3:].strip() for ln in body.split("\n") if ln.strip().startswith("## ")]
+
+
+def _template_keys(text: str):
+    """Chaves de topo declaradas no frontmatter do template."""
+    front, _body = split_frontmatter(text)
+    return set(re.findall(r"(?m)^([A-Za-z_][\w-]*):", front))
+
+
+def _check_against_template(path: str, rel: str, kind: str, text: str, tpl: str, issues, metadata):
+    """Checagens que comparam a nota com o template do seu `type:`."""
+    # 1. placeholder residual — linha de corpo idêntica a uma linha do template
+    tpl_lines = {s for _n, s, _raw in _body_lines(tpl)}
+    for lineno, s, raw in _body_lines(text):
+        if s in tpl_lines:
+            issues.append((rel, f"linha {lineno}: placeholder do template não substituído: {raw}"))
+
+    # 2. frontmatter preenchido, não só presente — só as chaves que o template tem
+    keys = _template_keys(tpl)
+    for key in REQUIRED_WHEN_IN_TEMPLATE + AGENT_ONLY_WHEN_IN_TEMPLATE:
+        if key not in keys:
+            continue
+        filled = read_frontmatter_list(path, key) if key == "tags" else read_frontmatter_value(path, key)
+        if filled:
+            continue
+        msg = f"frontmatter com `{key}` vazio (o template de {kind} declara a chave)"
+        bucket = metadata if key in AGENT_ONLY_WHEN_IN_TEMPLATE else issues
+        bucket.append((rel, msg))
+
+    # 3. seções faltando — cabeçalho extra na nota é permitido, faltar não é
+    lines = text.split("\n")
+    for section in _template_sections(tpl):
+        if _section_bounds(lines, section)[0] is None:
+            issues.append((rel, f"falta a seção `## {section}` do template de {kind}"))
+
+
+def _check_path(rel: str, path: str, kind: str, note_slug: str, projects_dir: str, issues):
+    """4. Caminho: onde cada tipo de nota tem de morar, e como o arquivo se chama."""
+    if kind == "task":
+        tasks_dir = os.path.dirname(path)
+        project_dir = os.path.dirname(tasks_dir)
+        if os.path.basename(tasks_dir) != "tasks" or os.path.dirname(project_dir) != projects_dir:
+            issues.append((rel, "task fora de projects/<slug>/tasks/"))
+        if not DATE_PREFIX_RE.match(note_slug):
+            issues.append((rel, "task sem prefixo de data no nome (esperado: yyyy-mm-dd-<slug>.md)"))
+    elif kind == "project":
+        folder = os.path.dirname(path)
+        if os.path.dirname(folder) != projects_dir or os.path.basename(folder) != note_slug:
+            issues.append((rel, f"projeto fora de projects/{note_slug}/{note_slug}.md"))
+    elif kind == "daily" and not DATE_RE.match(note_slug):
+        issues.append((rel, "daily com nome fora do padrão yyyy-mm-dd.md"))
+
+
 def cmd_lint(args):
-    """Aponta o que está fora do padrão: nomenclatura, frontmatter e links."""
+    """Portão do fluxo: audita o vault e sai com código ≠ 0 se houver erro."""
     vault = args.vault
-    issues, pending = [], []
+    issues, pending, metadata = [], [], []
     notes = sorted(iter_notes(vault))
     slugs = {note_slug for _p, note_slug in notes}
 
@@ -554,16 +435,43 @@ def cmd_lint(args):
         if not SLUG_RE.match(note_slug):
             issues.append((rel, f"nome fora do kebab-case (sugerido: {slugify(note_slug)}.md)"))
 
-        kind = read_frontmatter_value(path, "type")
-        if kind in ("project", "task", "lesson", "knowledge") and not read_frontmatter_value(path, "title"):
-            issues.append((rel, "frontmatter sem `title`"))
-        if kind in ("project", "lesson", "knowledge") and not read_frontmatter_list(path, "tags"):
-            issues.append((rel, "frontmatter sem `tags`"))
-        if kind == "task" and not read_frontmatter_value(path, "project"):
-            issues.append((rel, "task sem `project`"))
+        try:
+            with open(path, encoding="utf-8") as fh:
+                text = fh.read()
+        except OSError as exc:
+            issues.append((rel, f"não consegui ler o arquivo: {exc}"))
+            continue
 
-        with open(path, encoding="utf-8") as fh:
-            body = strip_code(fh.read())
+        kind = read_frontmatter_value(path, "type")
+        tpl = template_text(vault, kind) if kind in TEMPLATE_FILE else None
+        if tpl is not None:
+            _check_against_template(path, rel, kind, text, tpl, issues, metadata)
+        elif kind in TEMPLATE_FILE:
+            # sem o template não há contra o que comparar: `title`, `tags`,
+            # `project`, placeholder e seções deixam de ser auditados nesta nota.
+            # Avisa em vez de calar — mas é aviso, não erro: template ausente é
+            # defeito do vault, não da nota.
+            metadata.append(
+                (rel, f"template de {kind} ausente, checagens de frontmatter e seções puladas")
+            )
+        else:
+            # `type:` é a chave de junção da auditoria: placeholder residual,
+            # frontmatter, seções e caminho todos dependem dele para saber contra
+            # qual template comparar. Sem um `type:` reconhecido a nota atravessa
+            # o lint inteira sem uma única linha de saída — por isso é erro, não
+            # metadado: não é dívida histórica nem informação, é nota que escapa
+            # de toda a auditoria.
+            got = f"`type: {kind}` desconhecido" if kind else "frontmatter sem `type:`"
+            issues.append(
+                (
+                    rel,
+                    f"{got} — a nota escapa de toda a auditoria; "
+                    f"use um de: {', '.join(sorted(TEMPLATE_FILE))}",
+                )
+            )
+        _check_path(rel, path, kind, note_slug, projects_dir, issues)
+
+        body = strip_code(text)
         for target, _anchor, _label in WIKILINK_RE.findall(body):
             target = target.strip()
             if target.endswith((".pdf", ".png", ".jpg", ".jpeg", ".ppt", ".pptx")):
@@ -577,6 +485,8 @@ def cmd_lint(args):
 
     for rel, msg in pending:
         print(f"[pendente] {rel}: {msg}")
+    for rel, msg in metadata:
+        print(f"[metadado] {rel}: {msg}")
     if not issues:
         print("[ok] vault dentro do padrão.")
         return
@@ -591,7 +501,7 @@ def cmd_lint(args):
 # O `fmt` cuida das regras de forma que são deterministas — desfazer hard wrap e
 # garantir o divider `---` sob cada cabeçalho. São regras que o modelo esquece ao
 # longo de uma sessão longa, e que uma função aplica sempre igual. O que NÃO está
-# aqui é densidade textual: cortar redundância é julgamento, e mora no SKILL.md.
+# aqui é densidade textual: cortar redundância é julgamento, e mora nas rules.
 
 FENCE_RE = re.compile(r"^\s{0,3}(?:```|~~~)")
 HEADER_RE = re.compile(r"^#{1,6}\s+\S")
@@ -608,14 +518,6 @@ LIST_ITEM_RE = re.compile(r"^\s*(?:[-*+]\s+|\d+[.)]\s+)")
 def _is_indented_code(line: str) -> bool:
     """Linha indentada que NÃO pertence a um item de lista = bloco de código."""
     return (line.startswith("    ") or line.startswith("\t")) and not LIST_ITEM_RE.match(line)
-
-
-def split_frontmatter(text: str):
-    """Separa o frontmatter YAML do corpo. O frontmatter nunca é reformatado."""
-    m = re.match(r"^---\n.*?\n---\n?", text, re.DOTALL)
-    if not m:
-        return "", text
-    return m.group(0), text[m.end():]
 
 
 def _is_continuation(line: str, prev: str) -> bool:
@@ -771,7 +673,8 @@ def cmd_commit(args):
     if _git(vault, "rev-parse", "--is-inside-work-tree").returncode != 0:
         sys.exit(
             f"[erro] o vault não é um repositório git: {vault}\n"
-            f'       rode `git -C "{vault}" init` antes de versionar.'
+            f"       versionar o vault é decisão do usuário: reporte e pare, "
+            f"não rode `git init`."
         )
 
     add = _git(vault, "add", "-A")
@@ -795,79 +698,14 @@ def cmd_commit(args):
         print(f"  {f}")
 
 
-def cmd_folder(args):
-    print(resolve_folder(args.vault, args.role))
-
-
-def cmd_tree(args):
-    for role in FOLDER_ROLE:
-        try:
-            full = resolve_folder(args.vault, role)
-        except SystemExit:
-            print(f"{role:12} (pasta ausente)")
-            continue
-        n = sum(1 for _ in iter_notes(full))
-        extra = ""
-        if role == "projects":
-            projects = [d for d in sorted(os.listdir(full)) if os.path.isdir(os.path.join(full, d))]
-            tasks = sum(
-                len([f for f in os.listdir(os.path.join(full, d, "tasks")) if f.endswith(".md")])
-                for d in projects
-                if os.path.isdir(os.path.join(full, d, "tasks"))
-            )
-            extra = f" — {len(projects)} projeto(s), {tasks} task(s)"
-        print(f"{os.path.basename(full):12} — {n} nota(s){extra}")
-
-
-def today() -> str:
-    return dt.date.today().isoformat()
-
-
 def main():
     p = argparse.ArgumentParser(description="Utilitário do vault second brain.")
     sub = p.add_subparsers(dest="cmd", required=True)
-
-    sp = sub.add_parser("slug", help="imprime o slug canônico de um título")
-    sp.add_argument("text")
-    sp.set_defaults(func=cmd_slug)
 
     sp = sub.add_parser("find", help="procura nota existente por slug/título/alias")
     sp.add_argument("vault")
     sp.add_argument("term")
     sp.set_defaults(func=cmd_find)
-
-    sp = sub.add_parser("new", help="cria uma nota nova no lugar certo")
-    sp.add_argument("vault")
-    sp.add_argument("kind", choices=["project", "task", "lesson", "knowledge", "dump"])
-    sp.add_argument("title")
-    sp.add_argument("--project", default="", help="slug do projeto (obrigatório em task)")
-    sp.add_argument("--progress", default="", help="síntese do bullet de Progresso (task)")
-    sp.add_argument("--no-progress", action="store_true", help="não registra o bullet no projeto")
-    sp.add_argument("--date", default=today())
-    sp.set_defaults(func=cmd_new)
-
-    sp = sub.add_parser("template", help="imprime um template do vault já renderizado")
-    sp.add_argument("vault")
-    sp.add_argument("kind", choices=sorted(TEMPLATE_FILE))
-    sp.add_argument("--title", default="")
-    sp.add_argument("--date", default=today())
-    sp.set_defaults(func=cmd_template)
-
-    sp = sub.add_parser("daily", help="garante/abre a nota do dia (a partir do template do vault)")
-    sp.add_argument("vault")
-    sp.add_argument("--date", default=today())
-    sp.set_defaults(func=cmd_daily)
-
-    sp = sub.add_parser("log", help="registra uma entrada na Daily")
-    sp.add_argument("vault")
-    sp.add_argument("title")
-    sp.add_argument("description", nargs="?", default="")
-    sp.add_argument("--section", choices=DAILY_SECTIONS, default=DAILY_SECTIONS[-1])
-    sp.add_argument("--date", default=today())
-    sp.set_defaults(func=cmd_log)
-
-    sp = sub.add_parser("version", help="imprime a versão da skill")
-    sp.set_defaults(func=cmd_version)
 
     sp = sub.add_parser("tags", help="lista o vocabulário de tags em uso")
     sp.add_argument("vault")
@@ -879,22 +717,13 @@ def main():
     sp.add_argument("--check", action="store_true", help="só relata o que está fora do padrão")
     sp.set_defaults(func=cmd_fmt)
 
-    sp = sub.add_parser("lint", help="aponta nomenclatura, frontmatter e links fora do padrão")
+    sp = sub.add_parser("lint", help="audita o vault contra os templates (exit ≠ 0 se houver erro)")
     sp.add_argument("vault")
     sp.set_defaults(func=cmd_lint)
 
     sp = sub.add_parser("commit", help="versiona o vault num commit único (fim da sessão)")
     sp.add_argument("vault")
     sp.set_defaults(func=cmd_commit)
-
-    sp = sub.add_parser("folder", help="resolve a pasta pelo papel (dump, projects, lessons…)")
-    sp.add_argument("vault")
-    sp.add_argument("role", choices=FOLDER_ROLE)
-    sp.set_defaults(func=cmd_folder)
-
-    sp = sub.add_parser("tree", help="visão rápida da estrutura")
-    sp.add_argument("vault")
-    sp.set_defaults(func=cmd_tree)
 
     args = p.parse_args()
     args.func(args)
