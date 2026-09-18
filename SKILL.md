@@ -2,7 +2,7 @@
 name: intelect-devorer-skill
 description: Captura e organiza conhecimento no vault "second brain" do Obsidian do usuário — de sessões de código, estudos, projetos e ideias — como notas atômicas, interligadas e recuperáveis, seguindo uma estrutura fixa de pastas (dump, daily, projects, lessons, knowledge, resources, archives). Use esta skill sempre que o usuário quiser salvar, capturar, registrar, anotar ou arquivar algo no vault / segundo cérebro / Obsidian — por exemplo "anota isso", "salva no meu vault", "registra essa decisão do projeto", "abre uma task pra isso", "transforma isso numa nota de conhecimento", "adiciona ao meu segundo cérebro", ou ao final de uma sessão de código/estudo que valha a pena preservar. Também vale quando se está trabalhando diretamente dentro de um diretório de vault do Obsidian. Dispare mesmo que o usuário não diga "Obsidian" explicitamente, desde que a intenção seja claramente persistir conhecimento nas notas dele.
 metadata:
-  version: "0.5.0"
+  version: "0.5.2"
 ---
 
 # Intelect Devorer Skill
