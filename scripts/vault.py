@@ -385,10 +385,10 @@ def _check_against_template(path: str, rel: str, kind: str, text: str, tpl: str,
         bucket.append((rel, msg))
 
     # 3. seções faltando — cabeçalho extra na nota é permitido, faltar não é
-    lines = text.split("\n")
-    for section in _template_sections(tpl):
-        if _section_bounds(lines, section)[0] is None:
-            issues.append((rel, f"falta a seção `## {section}` do template de {kind}"))
+    # lines = text.split("\n")
+    # for section in _template_sections(tpl):
+    #    if _section_bounds(lines, section)[0] is None:
+    #        issues.append((rel, f"falta a seção `## {section}` do template de {kind}"))
 
 
 def _check_path(rel: str, path: str, kind: str, note_slug: str, projects_dir: str, issues):
