@@ -62,7 +62,7 @@ Todo cabeçalho `##` leva `---` na linha seguinte, o conteúdo começa **imediat
 ---
 Os números abaixo são teto. Uma frase que já baste vale mais que duas que preencham o orçamento:
 
-- **Bullet de Decisão técnica ou Progresso: até 2 frases.** A primeira diz o que foi decidido ou feito, a segunda o motivo ou o resultado. O bullet é índice — o detalhe (spec, execução, validação) mora na task para a qual ele aponta.
+- **Bullet de Decisão técnica ou Progresso: até 2 frases.** A primeira diz o que foi decidido ou feito, a segunda o motivo ou o resultado. O bullet é índice — o detalhe (situação, o que foi feito, validação) mora na task para a qual ele aponta.
 - **Entrada de Daily: uma linha, e a síntese em até ~110 caracteres.** O wikilink não entra na conta: o comprimento dele vem do slug, que nem sempre se pode encurtar — o de uma task datada tem mediana 116 caracteres e chega a 134 sozinho. A Daily preserva o contexto do dia, nunca o conhecimento.
 
 Exemplo de bullet de Progresso no teto:
@@ -84,7 +84,7 @@ Antes de explicar um conceito geral dentro de um Project, de uma task ou da Dail
 
 ## Autoconferência antes de gravar
 ---
-Rode estas seis perguntas contra o rascunho, com o texto à vista. Cada uma é verificável olhando para o que está escrito:
+Rode estas sete perguntas contra o rascunho, com o texto à vista. Cada uma é verificável olhando para o que está escrito:
 
 1. O primeiro parágrafo **entrega o fato** ou apenas anuncia o assunto?
 2. Existe alguma frase que, apagada, não levaria informação junto — meta-comentário, conclusão que só resume, repetição do título?
@@ -92,9 +92,10 @@ Rode estas seis perguntas contra o rascunho, com o texto à vista. Cada uma é v
 4. Cada nome canônico tem **exatamente uma** marcação — itálico, backtick ou link — e o critério foi o uso (tecnologia versus literal de código)?
 5. Cada quebra de linha marca fronteira semântica, e cada `##` tem `---` logo abaixo com o conteúdo colado nele?
 6. Algum parágrafo explica um conceito que já é (ou deveria ser) nota própria, em vez de linkar para ela?
+7. Alguma frase só faz sentido com a spec, o plano ou outro artefato fora do vault aberto ao lado — id de tarefa, de requisito ou de decisão, "conforme o design"? (`rules/autossuficiencia.md`)
 
 Qualquer resposta desconfortável se corrige no rascunho, antes de gravar — depois de gravado, `fmt` conserta a forma, mas densidade só você conserta.
 
-A conferência deixa **uma linha de rastro por nota**, escrita na conversa imediatamente antes de gravar e nunca dentro da nota: `conferência <slug>: <n.º da pergunta> — <o que mudou no rascunho>`. Uma correção basta como rastro. Quando nenhuma das seis bate, o rastro é `conferência <slug>: nenhuma bateu` — e essa frase é uma afirmação sobre o rascunho que está à vista, não uma formalidade. Duas notas, dois rastros; o bullet de Progresso acrescentado a um projeto é uma nota tocada e tem o rastro dele.
+A conferência deixa **uma linha de rastro por nota**, escrita na conversa imediatamente antes de gravar e nunca dentro da nota: `conferência <slug>: <n.º da pergunta> — <o que mudou no rascunho>`. Uma correção basta como rastro. Quando nenhuma das sete bate, o rastro é `conferência <slug>: nenhuma bateu` — e essa frase é uma afirmação sobre o rascunho que está à vista, não uma formalidade. Duas notas, dois rastros; o bullet de Progresso acrescentado a um projeto é uma nota tocada e tem o rastro dele.
 
-O teto é o que a linha genérica não cumpre: `revisei as seis` não diz sobre qual texto, e é exatamente o que sai de uma conferência rodada de cabeça.
+O teto é o que a linha genérica não cumpre: `revisei as sete` não diz sobre qual texto, e é exatamente o que sai de uma conferência rodada de cabeça.

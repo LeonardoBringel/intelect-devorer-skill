@@ -75,7 +75,7 @@ Preencha só as chaves que o template daquele tipo traz, na ordem em que ele as 
 - `project` — só em `task`, na forma `project: "[[slug|Título]]"`. As aspas são obrigatórias: sem elas o YAML lê `[[` como lista aninhada. O título é o `title:` da nota principal do projeto, não o slug.
 - `status` — só em `task`. Fica no `todo` que o template entrega enquanto a task não terminou; task registrada depois do trabalho feito nasce `done`.
 - `template_version` — do vault. Copie como está, aspas inclusive, e não incremente.
-- `skill_version` — a versão desta skill: o campo `metadata.version` do frontmatter do `SKILL.md`, que você já tem em contexto. Entre aspas: `skill_version: "0.5.0"`.
+- `skill_version` — a versão desta skill: o campo `metadata.version` do frontmatter do `SKILL.md`, que você já tem em contexto. Entre aspas: `skill_version: "x.x.x"`.
 - `llm_model_used` — o modelo que está escrevendo agora, sem aspas: `claude-opus-5`. Se estiver editando uma nota já existente que foi criada por um modelo diferente, atualize.
 
 Uma data por sessão: rode `date +%F` uma vez e reuse o valor em todas as notas tocadas.

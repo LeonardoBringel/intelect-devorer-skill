@@ -21,7 +21,7 @@ A nota principal tem cinco seções, na ordem do `project-template.md`: **Objeti
 Duas regras não-negociáveis:
 
 - **Decisões técnicas e Progresso são sempre datados** (`yyyy-mm-dd`), porque os dois só fazem sentido em ordem cronológica — uma decisão de hoje pode reverter a de duas semanas atrás, e sem data ficam duas afirmações contraditórias lado a lado. Decisão: `- 2026-09-05: **decisão curta** — motivo.` Cada bullet em até 2 frases; a decisão revista não é apagada, ganha um bullet novo que diz o que mudou e por quê. Ao adicionar uma nova linha datada, adicione sempre no **fim** da seção.
-- **Todo avanço vira uma task**, e o bullet de Progresso aponta pra ela: `- 2026-09-05: síntese em até 2 frases. → [[2026-09-05-expor-minio-no-nginx|Expor MinIO no nginx]]`. O bullet é o índice; o detalhe (spec, execução, validação) mora na task. Progresso que não cabe numa task — não houve trabalho, só uma constatação — normalmente é decisão técnica ou pendência, não progresso.
+- **Todo avanço vira uma task**, e o bullet de Progresso aponta pra ela: `- 2026-09-05: síntese em até 2 frases. → [[2026-09-05-expor-minio-no-nginx|Expor MinIO no nginx]]`. O bullet é o índice; o detalhe (situação, o que foi feito, validação) mora na task. Progresso que não cabe numa task — não houve trabalho, só uma constatação — normalmente é decisão técnica ou pendência, não progresso.
 
 **Aprendizados é uma lista de links** pras notas de `lessons/` e `knowledge/` que o projeto rendeu: `- [[export-diario-do-crontab-espelha-nao-instala|Export diário do crontab espelha, não instala]]`. Nunca o conhecimento colado ali dentro — o que vale além do projeto vira nota própria e o projeto aponta. Se a seção está vazia num projeto que já rendeu várias tasks, provavelmente há aprendizado não extraído.
 
@@ -33,11 +33,7 @@ O campo `updated:` do frontmatter acompanha a data de hoje a cada edição da no
 ---
 A nota de task vive em `projects/<slug>/tasks/` e o nome é datado: `yyyy-mm-dd-<slug-do-titulo>.md`. O campo `project:` do frontmatter leva o wikilink da nota principal.
 
-Três seções carregam o trabalho:
-
-- **Spec** — requisitos e critérios de aceite, normalmente derivados de uma `.spec`. Sem spec, escreva os critérios que você usaria pra dizer que a task terminou; a seção nunca fica vazia, porque é ela que torna o Resultado verificável.
-- **Execução** — o que foi feito, em ordem. Comando, caminho e mensagem de erro exatos.
-- **Resultado** — como ficou e **o que foi validado**, contra os critérios da Spec. "Funcionou" não é resultado; "`curl` no endpoint devolve 200 e o objeto aparece no bucket" é.
+O corpo segue o método *STAR* — **Situação**, **Tarefa**, **Ação**, **Resultado** — e o conteúdo de cada seção está em `rules/task-star.md`, carregada no passo 4. A task é lida sem a spec ao lado: nada de id de tarefa, de requisito ou de decisão da spec no lugar do conteúdo (`rules/autossuficiencia.md`).
 
 Aprendizado que apareceu durante a task e vale além dela não fica na task: vira nota em `lessons/` ou `knowledge/`, e a task e a nota principal apontam pra ela.
 

@@ -2,7 +2,7 @@
 name: intelect-devorer-skill
 description: Captura e organiza conhecimento no vault "second brain" do Obsidian do usuário — de sessões de código, estudos, projetos e ideias — como notas atômicas, interligadas e recuperáveis, seguindo uma estrutura fixa de pastas (dump, daily, projects, lessons, knowledge, resources, archives). Use esta skill sempre que o usuário quiser salvar, capturar, registrar, anotar ou arquivar algo no vault / segundo cérebro / Obsidian — por exemplo "anota isso", "salva no meu vault", "registra essa decisão do projeto", "abre uma task pra isso", "transforma isso numa nota de conhecimento", "adiciona ao meu segundo cérebro", ou ao final de uma sessão de código/estudo que valha a pena preservar. Também vale quando se está trabalhando diretamente dentro de um diretório de vault do Obsidian. Dispare mesmo que o usuário não diga "Obsidian" explicitamente, desde que a intenção seja claramente persistir conhecimento nas notas dele.
 metadata:
-  version: "0.5.2"
+  version: "0.6.0"
 ---
 
 # Intelect Devorer Skill
@@ -19,7 +19,7 @@ Cada passo carrega sua rule **no momento do passo**, não na ativação da skill
 - [ ] 1. Entender e decompor em notas atômicas → `rules/classificacao.md`
 - [ ] 2. Verificar se já existe → `vault.py find`
 - [ ] 3. Criar o arquivo a partir do template → `rules/templates.md`
-- [ ] 4. Escrever o corpo → `rules/escrita.md`
+- [ ] 4. Escrever o corpo → `rules/escrita.md`; em `projects`, também `rules/autossuficiencia.md`, e na task `rules/task-star.md`
 - [ ] 5. Conectar: Progresso, Aprendizados, Daily → `rules/registro.md`
 - [ ] 6. Validar → `vault.py fmt` + `vault.py lint`, em loop até verde
 - [ ] 7. Fechar o loop com o usuário → uma linha: o que foi criado ou atualizado, em que pasta, e os wikilinks principais
@@ -37,6 +37,7 @@ Valem em todo passo, por isso ficam aqui e não numa rule:
 - **Todo wikilink na forma `[[slug|Título]]`** — sem o pipe quando slug e título coincidem (`[[dotfiles]]`). `find` já imprime a forma pronta; copie de lá.
 - **Links importam mais que pastas.** Toda relação relevante entre duas notas vira link; nota rica em links é o alvo, não um excesso.
 - **Não duplique conhecimento — referencie.** Conceito que já é (ou deveria ser) nota própria entra por wikilink, nunca colado.
+- **O vault se explica sozinho.** A nota lida sem spec, repositório ou conversa ao lado basta para entender o contexto e o trabalho; id e caminho de artefato externo nunca substituem conteúdo. A referência por wikilink da regra acima vale para notas do vault, não para arquivos de fora dele.
 
 ## Gotchas
 ---
