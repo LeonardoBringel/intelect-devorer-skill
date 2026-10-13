@@ -62,7 +62,7 @@ Todo cabeçalho `##` leva `---` na linha seguinte, o conteúdo começa **imediat
 ---
 Os números abaixo são teto. Uma frase que já baste vale mais que duas que preencham o orçamento:
 
-- **Bullet de Decisão técnica ou Progresso: até 2 frases.** A primeira diz o que foi decidido ou feito, a segunda o motivo ou o resultado. O bullet é índice — o detalhe (situação, o que foi feito, validação) mora na task para a qual ele aponta.
+- **Bullet de Decisão técnica ou Progresso: até 2 frases.** A primeira diz o que foi decidido ou feito, a segunda o motivo ou o resultado. O bullet é índice — o detalhe (situação, o que foi feito, o que mudou) mora na task para a qual ele aponta.
 - **Entrada de Daily: uma linha, e a síntese em até ~110 caracteres.** O wikilink não entra na conta: o comprimento dele vem do slug, que nem sempre se pode encurtar — o de uma task datada tem mediana 116 caracteres e chega a 134 sozinho. A Daily preserva o contexto do dia, nunca o conhecimento.
 
 Exemplo de bullet de Progresso no teto:

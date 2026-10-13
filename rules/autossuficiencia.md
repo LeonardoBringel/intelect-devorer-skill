@@ -26,7 +26,7 @@ Rastro para artefato permanente do repositório — hash de commit, tag, link de
 ## Dois testes antes de gravar
 ---
 1. **O teste da borracha**: apague mentalmente todo identificador, caminho de spec e menção a artefato de planejamento. Se alguma frase perde o sentido ou fica sem sujeito, ela dependia da spec — reescreva com o conteúdo que o identificador escondia.
-2. **O leitor de fora**: alguém que conhece a stack mas não participou da sessão entende, só com a nota, qual era o problema, o que foi feito e como se validou? Se precisaria perguntar "o que é isso?", a resposta vai para a nota.
+2. **O leitor de fora**: alguém que conhece a stack mas não participou da sessão entende, só com a nota, qual era o problema, o que foi feito e o que isso mudou no projeto? Se precisaria perguntar "o que é isso?", a resposta vai para a nota.
 
 
 ## Errado / certo
