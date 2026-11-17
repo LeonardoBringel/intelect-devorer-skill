@@ -63,7 +63,7 @@ Todo cabeçalho `##` leva `---` na linha seguinte, o conteúdo começa **imediat
 Os números abaixo são teto. Uma frase que já baste vale mais que duas que preencham o orçamento:
 
 - **Bullet de Decisão técnica ou Progresso: até 2 frases.** A primeira diz o que foi decidido ou feito, a segunda o motivo ou o resultado. O bullet é índice — o detalhe (situação, o que foi feito, o que mudou) mora na task para a qual ele aponta.
-- **Entrada de Daily: uma linha, e a síntese em até ~110 caracteres.** O wikilink não entra na conta: o comprimento dele vem do slug, que nem sempre se pode encurtar — o de uma task datada tem mediana 116 caracteres e chega a 134 sozinho. A Daily preserva o contexto do dia, nunca o conhecimento.
+- **Entrada de Daily: uma linha, e a síntese em até ~110 caracteres.** Em `## Projetos` o teto vale para cada sub-item (task ou anotação); o pai é só o wikilink do projeto (`rules/registro.md`). O wikilink não entra na conta: o comprimento dele vem do slug, que nem sempre se pode encurtar — o de uma task datada tem mediana 116 caracteres e chega a 134 sozinho. A Daily preserva o contexto do dia, nunca o conhecimento.
 
 Exemplo de bullet de Progresso no teto:
 ```markdown
@@ -73,7 +73,8 @@ Exemplo de bullet de Progresso no teto:
 Exemplos de entrada de Daily no teto — duas entradas reais do vault, já com a marcação que a seção acima pede: síntese de 112 e de 114 caracteres. O `~` do teto é isto: dois caracteres de marcação não justificam reescrever uma linha boa.
 ```markdown
 - [[plugins-da-comunidade-no-obsidian|Plugins da comunidade no Obsidian]] — *Obsidian* não reinstala plugins sozinho; `community-plugins.json` só habilita, customização mora no `data.json`
-- [[langfuse-self-hosted|Langfuse Self-Hosted]] — Setup do Langfuse v4 no homeserver via `docker compose`, atrás da *Tailscale*, instância fechada de usuário único.
+- [[langfuse-self-hosted|Langfuse Self-Hosted]]
+	- Setup do Langfuse v4 no homeserver via `docker compose`, atrás da *Tailscale*, instância fechada de usuário único.
 ```
 
 ## Não duplique conhecimento

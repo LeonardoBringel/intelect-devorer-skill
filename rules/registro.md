@@ -41,7 +41,7 @@ Aprendizado que apareceu durante a task e vale além dela não fica na task: vir
 ---
 A Daily **indexa, não guarda conhecimento**: wikilink mais uma síntese de até ~110 caracteres dizendo o que mudou — o wikilink não entra na conta, porque o comprimento dele vem do slug. Explicação de conceito, trecho de código e raciocínio longo pertencem à nota linkada — se a linha da Daily precisa de um parágrafo, o parágrafo está na nota errada.
 
-Uma entrada tem a forma `- [[slug|Título]] — síntese.` — travessão, não hífen.
+Uma entrada tem a forma `- [[slug|Título]] — síntese.` — travessão, não hífen. Em `## Projetos` a entrada é hierárquica (ver abaixo).
 
 A seção sai do **tipo da nota**:
 
@@ -51,7 +51,28 @@ A seção sai do **tipo da nota**:
 | `lessons` e `knowledge` | `## Aprendizados` |
 | `dump`, `resources` e o resto | `## Outras notas` |
 
-**O padrão é uma linha por nota tocada**: uma interação, uma entrada — nota tocada uma vez aparece uma vez, não duas. Mas **uma segunda entrada para a mesma nota no mesmo dia é legítima quando houve interação separada e substantiva**: outra sessão, outro avanço, outro assunto dentro do mesmo projeto. O critério é ter algo diferente a dizer, não o wikilink ser inédito — wikilink repetido na Daily é comportamento normal num dia de várias conversas sobre o mesmo projeto, e a segunda linha se justifica pela síntese dela, não pelo slug. Quando o avanço é continuação do mesmo trabalho — a nota principal do projeto tocada duas ou três vezes dentro da mesma sessão —, **enriqueça a linha existente** em vez de acrescentar outra, porque duas linhas quase idênticas descrevendo o mesmo movimento não indexam nada a mais. Releia o arquivo inteiro antes de inserir justamente por isso: a releitura serve pra decidir entre enriquecer a linha que já está lá e abrir uma nova, não pra impedir repetição. A entrada nova vai no **fim** da seção, logo antes da linha em branco que antecede o próximo `##`.
+### Projetos: projeto pai, tasks e anotações como sub-itens
+---
+Em `## Projetos` cada projeto aparece **uma vez por Daily**, como item pai que é só o wikilink da nota principal, sem síntese. Tudo o que aconteceu no projeto naquele dia entra embaixo dele, como sub-item indentado com **um tab** (a indentação que o vault já usa nas listas aninhadas):
+
+```markdown
+- [[thyg|Thyg]]
+	- [[2026-11-16-remover-as-prioridades-das-historias-da-spec|Remover as prioridades das histórias da spec]] — P1/P2/P3 e MVP saíram da spec da *Thyg*; o "P0" da mutação virou "caminho crítico".
+	- Decisão de manter `state.md` fora da skill enquanto o vault cumprir esse papel.
+```
+
+Dois tipos de sub-item, nesta ordem:
+
+1. **Task** — `- [[slug-da-task|Título]] — síntese.` Uma linha por task criada ou avançada no dia, e a síntese diz o que a task mudou.
+2. **Anotação do projeto** — texto corrido, sem wikilink (o pai já aponta para a nota principal), para o que mudou na nota principal e **nenhuma task listada cobre**: decisão técnica tomada sem trabalho, pendência nova, mudança de objetivo. Uma linha por item, e só quando existir.
+
+O bullet de Progresso que aponta para a task, o `updated:` e o link de Aprendizados são consequência da task e **não** viram anotação: repetir na anotação o que a task já diz é exatamente a redundância que esta estrutura elimina. Projeto tocado só na nota principal, sem task, fica com o pai e as anotações embaixo, e nunca volta a ser linha única com síntese.
+
+### Uma linha por coisa dita
+---
+**O padrão é uma linha por nota tocada**: uma interação, uma entrada — nota tocada uma vez aparece uma vez, não duas. Mas **uma segunda entrada para a mesma nota no mesmo dia é legítima quando houve interação separada e substantiva**: outra sessão, outro avanço, outro assunto. O critério é ter algo diferente a dizer, não o wikilink ser inédito, e a segunda linha se justifica pela síntese dela, não pelo slug. Quando o avanço é continuação do mesmo trabalho, **enriqueça a linha existente** em vez de acrescentar outra, porque duas linhas quase idênticas descrevendo o mesmo movimento não indexam nada a mais. Em `## Projetos` isso vale para os sub-itens: o pai nunca se repete, e a sessão nova num projeto que já está na Daily acrescenta sub-item sob o pai existente.
+
+Releia o arquivo inteiro antes de inserir: a releitura serve pra decidir entre enriquecer a linha que já está lá e abrir uma nova, e em `## Projetos` pra achar o pai que já existe. A entrada nova vai no **fim** do seu bloco — o sub-item no fim da lista do seu pai (task antes de anotação), o projeto novo e as entradas das outras seções no fim da seção, logo antes da linha em branco que antecede o próximo `##`.
 
 Se a nota do dia não existe, ela nasce do `daily-template.md` seguindo `rules/templates.md` — o que inclui **não deixar os bullets-instrução do template no arquivo**: elas são instrução pro leitor do template, não conteúdo. Seção que recebe entrada real perde o bullet de exemplo; seção que fica sem entrada nenhuma no dia fica vazia, sem o placeholder.
 

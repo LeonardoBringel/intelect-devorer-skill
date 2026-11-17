@@ -2,7 +2,7 @@
 name: intelect-devorer-skill
 description: Captura e organiza conhecimento no vault "second brain" do Obsidian do usuário — de sessões de código, estudos, projetos e ideias — como notas atômicas, interligadas e recuperáveis, seguindo uma estrutura fixa de pastas (dump, daily, projects, lessons, knowledge, resources, archives). Use esta skill sempre que o usuário quiser salvar, capturar, registrar, anotar ou arquivar algo no vault / segundo cérebro / Obsidian — por exemplo "anota isso", "salva no meu vault", "registra essa decisão do projeto", "abre uma task pra isso", "transforma isso numa nota de conhecimento", "adiciona ao meu segundo cérebro", ou ao final de uma sessão de código/estudo que valha a pena preservar. Também vale quando se está trabalhando diretamente dentro de um diretório de vault do Obsidian. Dispare mesmo que o usuário não diga "Obsidian" explicitamente, desde que a intenção seja claramente persistir conhecimento nas notas dele.
 metadata:
-  version: "0.6.2"
+  version: "0.6.3"
 ---
 
 # Intelect Devorer Skill
@@ -45,7 +45,7 @@ Valem em todo passo, por isso ficam aqui e não numa rule:
 - **`llm_model_used` só o modelo sabe responder**: preencha com o nome do modelo que está escrevendo agora.
 - **`created` nunca muda em nota existente**, por mais que ela seja reescrita inteira; `updated` passa a ser o dia da edição. A data de hoje vem de `date +%F` uma vez por sessão, nunca de memória.
 - **`dump` não é destino permanente**: é trampolim para uma nota de `projects`, `lessons` ou `knowledge`. `archives` só recebe por decisão explícita do usuário, e nenhum arquivo do vault é deletado — no máximo movido para lá.
-- **A Daily indexa, não guarda conhecimento**: wikilink mais uma linha de síntese. Se a entrada precisa de um parágrafo, o parágrafo pertence à nota linkada.
+- **A Daily indexa, não guarda conhecimento**: wikilink mais uma linha de síntese; em `## Projetos`, o projeto é o item pai e tasks e anotações são sub-itens. Se a entrada precisa de um parágrafo, o parágrafo pertence à nota linkada.
 - **Não crie pasta de nível superior nova.** As sete de `rules/classificacao.md` são o conjunto completo; o que parece não caber é `knowledge` ou é detalhe de um projeto.
 - **Arquivo binário vai para `resources/`** e é referenciado por embed da nota que o cita — `![[palestra.pdf]]`, com o `!`, senão vira link e não incorpora. Link para site fica dentro da nota que o usa, nunca em `resources`.
 
